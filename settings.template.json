@@ -1,0 +1,46 @@
+{
+  "env": {
+    "CLAUDE_KIT_APPROVER": "{{APPROVER}}",
+    "CLAUDE_MONTHLY_BUDGET_USD": "{{MONTHLY_BUDGET_USD}}",
+    "CLAUDE_CYCLE": "{{CYCLE}}",
+    "CLAUDE_CYCLE_START_DAY": "{{CYCLE_START_DAY}}",
+    "CLAUDE_CONTEXT_WARN_TOKENS": "{{CONTEXT_WARN_TOKENS}}",
+    "CLAUDE_FOOTER_MARKER": "{{FOOTER_MARKER}}",
+    "CLAUDE_FOOTER_DISABLE": "{{FOOTER_DISABLE}}",
+    "CLAUDE_KIT_INVARIANTS": "{{INVARIANTS}}"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "Write|Edit|MultiEdit|NotebookEdit",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+      {"matcher": "Bash",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+      {"matcher": "mcp__.*__apply_migration",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+      {"matcher": "Bash",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/bash_output_cap.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 5}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "Write|Edit|MultiEdit",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/migration_check.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]}
+    ],
+    "PreCompact": [
+      {"matcher": "",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/precompact_dump.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]}
+    ],
+    "SessionStart": [
+      {"matcher": "compact",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/session_inject.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+      {"matcher": "resume",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/session_inject.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/footer_check.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]},
+      {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/usage_guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]}
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "f=\"$HOME/.claude/hooks/usage_statusline.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""
+  }
+}

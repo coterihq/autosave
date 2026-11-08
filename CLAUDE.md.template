@@ -1,0 +1,53 @@
+# CLAUDE.md
+
+Universal workflow rules: ~/.claude/rules/workflow.md (execution honesty,
+scope discipline, end-of-session review, handoff protocol). Read with this file.
+Hard controls: ~/.claude/hooks/guard.py (PreToolUse) blocks .env edits,
+live-mode toggles (DRY_RUN/TESTNET=false, --live), prod `supabase db reset/push`,
+Supabase MCP apply_migration, and root-level rm -rf. A block means: stop and ask
+{{APPROVER}}, except the two self-fixable rules: 5 (self-matching `pgrep -f` wait
+loop) and 6 (an unquoted $var that needs word-splitting; zsh does not split, so the
+command silently acts on nothing and still exits 0). For both: fix it and rerun.
+If ~/.claude/RULE_SYNC_DRIFT.md exists: standing rules have diverged.
+Resolve it (instructions inside) before other work.
+
+## About me
+<!-- Replace with 3-6 lines: who you are, what you build, how you like answers.
+     Example: "Solo full-stack dev. TypeScript + Postgres. Prefer bullets, decision
+     first, tables for comparisons. Ask before any prod write." -->
+
+---
+
+Four habits that cut the most common agent coding failures. Project-specific
+instructions win where they conflict. These favor care over speed; on trivial
+tasks, scale them down.
+
+## 1. Clarify before you build
+- Write down what you are assuming before you act on it.
+- When a request reads two ways, show both readings and let the approver choose.
+- Name a cheaper path when you see one, and disagree openly when it matters.
+- Confused? Stop and say exactly which part, then ask one focused question.
+
+## 2. Build the smallest thing that works
+- Deliver what was requested and nothing extra.
+- One caller means no abstraction layer; no knobs nobody asked for.
+- Skip defensive branches for states that cannot occur.
+- If a shorter version does the same job, ship the shorter version.
+
+## 3. Keep diffs narrow
+- Change only the lines the task needs, in the file's existing style.
+- Leave working neighbors alone: no drive-by reformatting or refactors.
+- Spot unrelated dead code? Point it out; leave it in place.
+- Clean up only what your own edit left unused.
+- Reviewer test: each changed line maps back to the request.
+
+## 4. Define done, then prove it
+- Restate the task as a check that can pass or fail ("fix the crash" ->
+  "a test reproduces the crash, then passes after the fix").
+- For multi-step work, list steps with the check that confirms each one.
+- Iterate until the checks pass; report what you verified and what you did not.
+
+## Standing rules (canonical: ~/.claude/rules/standing-rules.md)
+<!-- BEGIN STANDING-RULES (generated - edit the manifest, not this block) -->
+(filled from rules/standing-rules.md by check_rule_sync.py)
+<!-- END STANDING-RULES -->

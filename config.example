@@ -1,0 +1,35 @@
+# claude-ops-starter-kit configuration
+# Copy to kit.conf and edit:   cp config.example kit.conf
+# install.sh reads kit.conf if present, otherwise these defaults.
+# Values are substituted into rules, commands and skills at install time.
+
+# Your name as Claude should refer to you in rules (e.g. "Alex"). Plain text.
+USER_NAME="the user"
+
+# Who Claude must ask before risky actions (hard-control blocks, prod writes).
+# Usually the same as USER_NAME.
+APPROVER="the user"
+
+# Where your projects live (used by /dormant).
+PROJECTS_DIR="$HOME/projects"
+
+# Where regression evals live (used by /postmortem, incident-to-eval, /claude-audit).
+EVALS_DIR="$HOME/claude-evals"
+
+# Where /make-chart, /make-doc, /make-deck, /make-diagram, /make-sheet save output.
+OUTPUT_DIR="$HOME/claude-made"
+
+# Usage guard (hooks/usage_guard.py + statusline). Budget is an API-equivalent
+# dollar figure per cycle; calibrate it to the spend at which you hit your plan limit.
+MONTHLY_BUDGET_USD="200"
+CYCLE="monthly"            # monthly | weekly (Mon-start)
+CYCLE_START_DAY="1"        # day of month the cycle resets (monthly only)
+CONTEXT_WARN_TOKENS="150000"  # auto-handoff + warning above this context size
+
+# Footer check (hooks/footer_check.py). Off by default: when on, it sends Claude back for
+# another turn on any long reply missing FOOTER_MARKER. Set FOOTER_DISABLE=0 to turn it on.
+FOOTER_MARKER="Tooling rec"
+FOOTER_DISABLE="1"
+
+# Optional: one line of invariants the compaction hook must always preserve.
+INVARIANTS=""
