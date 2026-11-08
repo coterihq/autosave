@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# claude-ops-starter-kit installer. One command, idempotent, backs up before writing.
+# Autosave installer. One command, idempotent, backs up before writing.
 #   ./install.sh             install into ~/.claude (or $CLAUDE_DIR)
 #   ./install.sh --dry-run   show what would change, write nothing
 #   ./install.sh --no-settings   skip merging hooks into settings.json
 # Every existing file that would change is copied to
-#   ~/.claude/backups/starter-kit-<timestamp>/<same path>
+#   ~/.claude/backups/autosave-<timestamp>/<same path>
 # before it is touched. Re-running with no changes writes nothing.
 set -euo pipefail
 
@@ -31,7 +31,7 @@ fi
 set -a; source "$CONFIG"; set +a
 
 export KIT_DIR CLAUDE_DIR DRY_RUN DO_SETTINGS
-export BACKUP_DIR="$CLAUDE_DIR/backups/starter-kit-$(date +%Y%m%d-%H%M%S)"
+export BACKUP_DIR="$CLAUDE_DIR/backups/autosave-$(date +%Y%m%d-%H%M%S)"
 
 python3 - <<'PY'
 import filecmp, json, os, re, shutil, subprocess, sys
@@ -66,7 +66,7 @@ except ValueError as e:
 
 # Files a previous run of this installer wrote. Those are the kit's own and get updated;
 # any other file with the same name is the user's and is never replaced.
-manifest = dest / ".starter-kit-manifest.json"
+manifest = dest / ".autosave-manifest.json"
 owned = set(json.loads(manifest.read_text())) if manifest.exists() else set()
 installed = set()
 

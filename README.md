@@ -1,4 +1,4 @@
-# Claude Code Ops Starter Kit
+# Autosave for Claude Code
 
 A tested operating layer for Claude Code: safety hooks that the model cannot talk its
 way past, compaction and handoff tooling so long sessions don't lose the plot, a
@@ -7,6 +7,8 @@ commands for routine ops, and 27 evidence-first engineering skills.
 
 Everything installs into `~/.claude` with one command. Existing files are backed up
 before they are touched, and re-running the installer changes nothing.
+
+Autosave is an independent project. It is not affiliated with or endorsed by Anthropic.
 
 - Install: see [QUICKSTART.md](QUICKSTART.md)
 - Make it yours: see [CUSTOMIZE.md](CUSTOMIZE.md)
@@ -121,15 +123,15 @@ their "Not for" lines; those are pointers, not dependencies.
 
 `~/.claude/handoffs/` (handoffs), `~/.claude/state/` (session-critical fallback,
 compaction breadcrumb, audit log), `~/.claude/usage/` (ledger, digests),
-`~/.claude/RULE_SYNC_DRIFT.md` (only on drift), `~/.claude/backups/starter-kit-*`
+`~/.claude/RULE_SYNC_DRIFT.md` (only on drift), `~/.claude/backups/autosave-*`
 (installer backups).
 
 ## Uninstall
 
 1. Restore `settings.json` and `CLAUDE.md` from the newest
-   `~/.claude/backups/starter-kit-*` folder (it mirrors `~/.claude` paths), or remove
+   `~/.claude/backups/autosave-*` folder (it mirrors `~/.claude` paths), or remove
    the kit's hook entries from `~/.claude/settings.json` by hand.
-2. Delete the files listed in `~/.claude/.starter-kit-manifest.json`, then the
+2. Delete the files listed in `~/.claude/.autosave-manifest.json`, then the
    manifest itself. Skills and commands keep loading until you do.
 
 Either order is safe: a hook whose file is gone exits 0 and lets the call through.

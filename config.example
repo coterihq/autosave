@@ -1,4 +1,4 @@
-# claude-ops-starter-kit configuration
+# Autosave configuration
 # Copy to kit.conf and edit:   cp config.example kit.conf
 # install.sh reads kit.conf if present, otherwise these defaults.
 # Values are substituted into rules, commands and skills at install time.

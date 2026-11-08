@@ -3,7 +3,7 @@
 ## 1. Configure
 
 ```bash
-cd claude-ops-starter-kit   # from the zip; a git clone is claude-code-ops-kit
+cd autosave   # from the zip or a git clone
 cp config.example kit.conf
 ```
 
@@ -28,7 +28,7 @@ Skipping this step is fine: defaults are used ("the user", ~/projects, $200/mont
 What happens:
 
 - Hooks, commands, skills and rules are copied into `~/.claude`. Any existing
-  file that differs is first copied to `~/.claude/backups/starter-kit-<time>/`.
+  file that differs is first copied to `~/.claude/backups/autosave-<time>/`.
 - Your own files are never replaced: if you already have a hook, command, skill or
   rule file with the same name as one of the kit's, yours is kept and the kit version
   is written beside it as `*.kit-new`. Files the kit installed earlier are updated
