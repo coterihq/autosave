@@ -10,6 +10,8 @@ loop) and 6 (an unquoted $var that needs word-splitting; zsh does not split, so 
 command silently acts on nothing and still exits 0). For both: fix it and rerun.
 If ~/.claude/RULE_SYNC_DRIFT.md exists: standing rules have diverged.
 Resolve it (instructions inside) before other work.
+If ~/.claude/LOOSE_ALLOW_RULES.md exists: mention it to {{APPROVER}} once (count of
+loose Bash allow rules), then continue. Fixing = remove the listed rules, keep a .bak.
 
 ## About me
 <!-- Replace with 3-6 lines: who you are, what you build, how you like answers.

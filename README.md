@@ -3,7 +3,7 @@
 A tested operating layer for Claude Code: safety hooks that the model cannot talk its
 way past, compaction and handoff tooling so long sessions don't lose the plot, a
 spend/pace guard, a standing-rules system that stays in sync with CLAUDE.md, slash
-commands for routine ops, and 23 evidence-first engineering skills.
+commands for routine ops, and 27 evidence-first engineering skills.
 
 Everything installs into `~/.claude` with one command. Existing files are backed up
 before they are touched, and re-running the installer changes nothing.
@@ -40,6 +40,7 @@ Requirements: Claude Code, Python 3.9+, bash. Tested on macOS (zsh). Linux shoul
 | `usage_statusline.py` | statusLine | `model · pace · $spent/$budget · ctx` | Live pace without asking. |
 | `usage_digest.py` | cron (optional) | Weekly markdown digest: spend, pace, spend by tier, top 3 sessions. `--notes` also posts to Apple Notes on macOS. | Feeds `/claude-audit`. |
 | `check_rule_sync.py` | manual / cron / installer | Compares `rules/standing-rules.md` with the generated block in `CLAUDE.md`; on drift writes `RULE_SYNC_DRIFT.md`; `--fix` regenerates the block. Prints a short sha256 you can pin elsewhere. | One source of truth for rules across surfaces. |
+| `check_allow_wildcards.py` | cron (optional) | Flags Bash allow rules with a `*` before the end of the command in `~/.claude/settings*.json` and your projects' `.claude/settings*.json`; writes `LOOSE_ALLOW_RULES.md` and exits 1. Never edits settings. | A mid-command `*` silently auto-approves whatever options land there. |
 
 Spend figures are API-equivalent estimates from a PRICES table in `usage_guard.py`.
 The rates are list prices at release time: verify them against current Anthropic
@@ -72,6 +73,7 @@ do, the installer appends just the standing-rules marker block.
 | `/claude-audit` | Weekly: attribute usage, review hook hits, make exactly one targeted change, measure before/after. |
 | `/dormant` | Factual table of projects under your projects dir with last-touched dates. |
 | `/make-chart`, `/make-doc`, `/make-deck`, `/make-diagram`, `/make-sheet` | Router commands: restate the deliverable, pick the right skill or format, ask at most 3 questions, verify by looking, save to your output dir. They mention optional skills (Anthropic document skills, Artifacts, dataviz); remove routes you don't have. |
+| `/make-image` | Picks a route for an image: a local or connected image model, a designed layout, or hand-written SVG (always available); never generates charts of real data. |
 
 ## Skills (`skills/`)
 
@@ -107,6 +109,10 @@ writes start only after the approver records a go; findings alone never authoriz
 | `decision-flow-surgery` | The app has the information but shows it in the wrong order. |
 | `buried-capability-recovery` | Powerful features exist but users don't meet them when needed. |
 | `session-handoff` | Write or consume a handoff block across sessions or surfaces. |
+| `prior-work` | Before planning or building: find existing plans, specs, handoffs, decisions and rejected approaches, so nothing is rebuilt. |
+| `plan-redteam` | A written plan needs an adversarial review: ranked findings, assumption ledger, verdict; run by a reviewer who did not write it. |
+| `status` | Factual status of the current repo: where things stand, what's open, what's stale. |
+| `skill-trigger-test` | Check that an installed skill fires on the right prompts and stays quiet on near-misses (recall and false-trigger rate). |
 
 Some skills mention other public skills (e.g. `superpowers:*`, `engineering:*`) in
 their "Not for" lines; those are pointers, not dependencies.

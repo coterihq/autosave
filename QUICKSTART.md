@@ -3,7 +3,7 @@
 ## 1. Configure
 
 ```bash
-cd claude-ops-starter-kit
+cd claude-ops-starter-kit   # from the zip; a git clone is claude-code-ops-kit
 cp config.example kit.conf
 ```
 
@@ -56,6 +56,8 @@ somewhere other than `~/.claude` (handy for a trial run in a temp folder).
 - Weekly digest (cron, Sundays 18:05):
   `5 18 * * 0 python3 ~/.claude/hooks/usage_digest.py`
 - Nightly rule-sync check: `0 3 * * * python3 ~/.claude/hooks/check_rule_sync.py`
+- Nightly loose-permission check: `25 3 * * * python3 ~/.claude/hooks/check_allow_wildcards.py`
+  (flags Bash allow rules with a `*` mid-command; reads `CLAUDE_PROJECTS_DIR`)
 - Per project: copy `~/.claude/rules/templates/session-critical.template.md` to
   `docs/ai/state/session-critical.md` and keep it current before `/compact`.
 
