@@ -67,7 +67,9 @@ except ValueError as e:
 # Files a previous run of this installer wrote. Those are the kit's own and get updated;
 # any other file with the same name is the user's and is never replaced.
 manifest = dest / ".autosave-manifest.json"
-owned = set(json.loads(manifest.read_text())) if manifest.exists() else set()
+old_manifest = dest / ".starter-kit-manifest.json"  # name used by v1.0/v1.1, before the rename
+src = manifest if manifest.exists() else old_manifest
+owned = set(json.loads(src.read_text())) if src.exists() else set()
 installed = set()
 
 def backup_file(target):
@@ -166,6 +168,8 @@ if not dry:
     for d in ("handoffs", "state", "usage"):
         (dest / d).mkdir(parents=True, exist_ok=True)
     manifest.write_text(json.dumps(sorted(owned | installed), indent=1) + "\n")
+    if old_manifest.exists():
+        old_manifest.unlink()  # its entries now live in the new manifest
 print(f"\nDone: {stats['new']} new, {stats['updated']} updated, {stats['same']} unchanged, {stats['kept']} kept as yours.")
 if (stats["updated"] or stats["kept"]) and not dry and backup.exists():
     print(f"Backups: {backup}")
