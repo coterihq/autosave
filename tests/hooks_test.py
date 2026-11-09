@@ -65,6 +65,39 @@ def test_session_stats_includes_subagents():
     assert (ctx2, model2) == (ctx, model)
 
 
+# --- B3: atomic ledger, corrupt ledger recovers instead of erroring every turn ---
+QUIET = {"CLAUDE_MONTHLY_BUDGET_USD": "1000000", "CLAUDE_CONTEXT_WARN_TOKENS": "1000000000"}
+
+
+def _guard_run(home, ledger_text=None):
+    led = home / ".claude/usage/ledger.json"
+    if ledger_text is not None:
+        led.parent.mkdir(parents=True, exist_ok=True); led.write_text(ledger_text)
+    tp = home / "s.jsonl"; shutil.copy(FIX / "transcript_dup.jsonl", tp)
+    return run_hook("usage_guard.py", {"session_id": "s", "transcript_path": str(tp)}, home, env=QUIET), led
+
+
+def test_corrupt_ledger_recovers_once():
+    h = tmp_home()
+    r, led = _guard_run(h, "{not json")
+    assert "error" not in r.stdout, r.stdout
+    assert len(list(led.parent.glob("ledger.json.corrupt-*"))) == 1
+    assert json.loads(led.read_text())["sessions"]["s"] > 0
+    r2, _ = _guard_run(h)
+    assert "error" not in r2.stdout and len(list(led.parent.glob("ledger.json.corrupt-*"))) == 1
+
+
+def test_empty_ledger_is_corrupt_not_crash():
+    r, led = _guard_run(tmp_home(), "")
+    assert "error" not in r.stdout, r.stdout
+    assert json.loads(led.read_text())["sessions"]["s"] > 0
+
+
+def test_ledger_write_leaves_no_tmp():
+    r, led = _guard_run(tmp_home())
+    assert r.returncode == 0 and led.exists() and not list(led.parent.glob("ledger.json.tmp*"))
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

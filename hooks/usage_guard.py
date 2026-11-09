@@ -86,11 +86,30 @@ def cycle_bounds(today, start_day):
     return start, end
 
 
-def load_ledger(start):
-    led = json.loads(LEDGER.read_text()) if LEDGER.exists() else {}
+def load_ledger(start, quarantine=True):
+    """Ledger for this cycle. An unreadable ledger (bad JSON, empty file) starts fresh; with
+    quarantine=True it is first renamed to ledger.json.corrupt-<time> so it errors only once."""
+    led = {}
+    if LEDGER.exists():
+        try:
+            led = json.loads(LEDGER.read_text())
+            if not isinstance(led, dict) or not isinstance(led.get("sessions", {}), dict):
+                raise ValueError("not a ledger")
+        except (ValueError, OSError):
+            led = {}
+            if quarantine:
+                LEDGER.replace(LEDGER.with_name(f"ledger.json.corrupt-{dt.datetime.now():%Y%m%d%H%M%S}"))
     if led.get("cycle_start") != start.isoformat():
         led = {"cycle_start": start.isoformat(), "sessions": {}}
     return led
+
+
+def save_ledger(led):
+    """Write via a temp file + os.replace so a concurrent reader never sees half a ledger."""
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    tmp = LEDGER.with_name(f"ledger.json.tmp-{os.getpid()}")
+    tmp.write_text(json.dumps(led, indent=1))
+    os.replace(tmp, LEDGER)
 
 
 def pace_for(spent, budget, start, end, today):
@@ -151,10 +170,9 @@ def main():
     cost, ctx, model = session_stats(tp)
     today = dt.date.today()
     start, end = cycle_bounds(today, start_day)
-    LEDGER.parent.mkdir(parents=True, exist_ok=True)
     led = load_ledger(start)
     led["sessions"][hook.get("session_id", tp.stem)] = round(cost, 4)
-    LEDGER.write_text(json.dumps(led, indent=1))
+    save_ledger(led)
     spent = sum(led["sessions"].values())
     pace = pace_for(spent, budget, start, end, today)
     msgs, t = [], tier(model)
