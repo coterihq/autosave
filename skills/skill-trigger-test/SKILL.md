@@ -1,6 +1,6 @@
 ---
 name: skill-trigger-test
-description: Use to check whether an already-installed skill fires on the right prompts and stays out of near-misses (recall and false-trigger rate), e.g. "does plan-redteam trigger correctly", "test the skill's triggers". Not for new, uninstalled skills; use skill-creator's description loop for those.
+description: Use to check whether an already-installed skill fires on the right prompts and stays out of near-misses (recall and false-trigger rate), e.g. "does assumption-breaker trigger correctly", "test the skill's triggers". Not for new, uninstalled skills; use skill-creator's description loop for those.
 ---
 
 # Skill Trigger Test

@@ -9,7 +9,6 @@ Classify, then run only the relevant branch.
 
 | Situation | Specialist skill | Proposed first move |
 |---|---|---|
-| Multiple agents or threads writing | safe-agent-execution | Scope contract, one owner per file, diff against contract |
 | Consequential rollout (migration, deploy, shared data) | release-and-recovery-rehearsal | Success signal, tested recovery, approval, observe |
 | Session drifting, compacted or being handed off | context-loss-recovery | Re-observe, ledger, invalidate stale artifacts, cold-start check |
 | Bug just fixed (cause known) | incident-to-immunity | Repro, fix, regression test, sibling scan |
@@ -19,7 +18,7 @@ Classify, then run only the relevant branch.
 | Unclear | smallest discriminating investigation | One cheap observation that separates the candidate explanations |
 
 ## Escalate if
-- Two branches both apply: run them in this order, one at a time: assumption-breaker, change-impact-recon, safe-agent-execution, context-loss-recovery, release-and-recovery-rehearsal, incident-to-immunity, outcome-validation.
+- Two branches both apply: run them in this order, one at a time: assumption-breaker, change-impact-recon, context-loss-recovery, release-and-recovery-rehearsal, incident-to-immunity, outcome-validation.
 - The cheap observation does not separate the candidates: report Inconclusive and ask.
 
 ## Skip if
@@ -32,3 +31,6 @@ Classify, then run only the relevant branch.
 - Name the target environment/account on every step or proposal; no external writes without a separate approval.
 
 Never run every branch.
+
+## Parallel writing boundary
+This free kit does not include a parallel-agent coordination workflow. Do not dispatch concurrent writers without a separately reviewed coordination plan; use one writer at a time otherwise.

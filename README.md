@@ -3,7 +3,7 @@
 A tested operating layer for Claude Code: safety hooks that the model cannot talk its
 way past, compaction and handoff tooling so long sessions don't lose the plot, a
 spend/pace guard, a standing-rules system that stays in sync with CLAUDE.md, slash
-commands for routine ops, and 27 evidence-first engineering skills.
+commands for routine ops, and 25 evidence-first engineering skills.
 
 Everything installs into `~/.claude` with one command. Existing files are backed up
 before they are touched, and re-running the installer changes nothing.
@@ -32,7 +32,7 @@ Requirements: Claude Code, Python 3.9+, bash. Tested on macOS (zsh). Linux shoul
 | Hook | Event | What it does | Why |
 |---|---|---|---|
 | `guard.py` | PreToolUse (Write/Edit, Bash, MCP `apply_migration`) | Blocks: edits or shell writes to `.env*` (examples/templates allowed); live-mode toggles (`DRY_RUN=false`, `*TESTNET=false`, `--live`); `supabase db reset/push` against a linked project, plus any project wrapper you list in `CLAUDE_GUARD_DB_WRAPPERS`; Supabase MCP `apply_migration`; `rm -rf` on `/`, `~`, `$HOME`, their `/*`, or `~/.claude`. Quoted text (a grep pattern, a commit message) is not treated as a use. Also blocks two self-fixable shell bugs: a wait loop that greps the process table and matches itself forever, and, when your shell is zsh, an unquoted multi-value `$var` (zsh does not word-split, so the command silently acts on nothing). The `DRY_RUN`/`TESTNET`/`--live` and Supabase rules only fire if you use those; they never get in the way otherwise. | An exit code 2 stops the call no matter what the model decides. Fails open on parse errors, and every hook command exits 0 if its file is missing, so a broken or deleted guard never blocks a session. |
-| `guard_tests.py` | manual / installer | 20 regression cases for `guard.py`; each block must fail for the intended reason. | Run after editing the guard. |
+| `guard_tests.py` | manual / installer | 41 regression cases for `guard.py`; each block must fail for the intended reason. | Run after editing the guard. |
 | `bash_output_cap.py` | PreToolUse (Bash) | Warns (never blocks) when a likely-huge command (`cat`, `rg`, `git log`, `curl`...) has no `head`/`tail`/`wc`/`LIMIT`. | Every byte of output is re-read on each turn; this is the cheapest context saving there is. |
 | `migration_check.py` | PostToolUse | After writing `supabase/migrations/*.sql`, flags any `CREATE TABLE/VIEW/FUNCTION` without a matching `GRANT`. | RLS alone does not expose objects to PostgREST; missing GRANTs cause 42501 errors in prod. Harmless if you don't use Supabase. |
 | `precompact_dump.py` | PreCompact | Injects non-negotiable preservation instructions into the compaction prompt and logs the event. | Survival rules fire even when CLAUDE.md has been drowned out. |
@@ -93,7 +93,6 @@ writes start only after the approver records a go; findings alone never authoriz
 |---|---|
 | `assumption-breaker` | About to build a plausible but unproven solution: rank assumptions by blast radius, run the smallest discriminating test. |
 | `change-impact-recon` | Editing shared logic/schemas: consumer impact map, invariants, focused regression set. |
-| `safe-agent-execution` | Parallel agents may collide: scope contract, ownership map, verification ledger. |
 | `context-loss-recovery` | After compaction/drift/handoff: invalidate stale plans, cold-start check. |
 | `release-and-recovery-rehearsal` | Consequential rollout: success signals, rehearsed recovery on non-prod, bounded release. |
 | `incident-to-immunity` | Bug fixed: sibling scan for the same mechanism, one narrow prevention rule or "no rule". |
@@ -112,7 +111,6 @@ writes start only after the approver records a go; findings alone never authoriz
 | `buried-capability-recovery` | Powerful features exist but users don't meet them when needed. |
 | `session-handoff` | Write or consume a handoff block across sessions or surfaces. |
 | `prior-work` | Before planning or building: find existing plans, specs, handoffs, decisions and rejected approaches, so nothing is rebuilt. |
-| `plan-redteam` | A written plan needs an adversarial review: ranked findings, assumption ledger, verdict; run by a reviewer who did not write it. |
 | `status` | Factual status of the current repo: where things stand, what's open, what's stale. |
 | `skill-trigger-test` | Check that an installed skill fires on the right prompts and stays quiet on near-misses (recall and false-trigger rate). |
 
