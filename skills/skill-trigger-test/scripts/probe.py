@@ -2,7 +2,7 @@
 """Trigger test for an INSTALLED skill: runs `claude -p` per query and checks whether the first turn calls Skill(<name>).
 
 skill-creator's eval loop can't test an installed skill (it looks for a temp copy, and the real one wins). This can.
-Usage: probe.py --skill plan-redteam --eval-set evals.json [--runs 1] [--workers 4] [--out DIR] [--cwd ~]
+Usage: probe.py --skill assumption-breaker --eval-set evals.json [--runs 1] [--workers 4] [--out DIR] [--cwd ~]
 Eval set: [{"query": "...", "should_trigger": true}, ...]
 Limit: first turn only (--max-turns 1); a skill called after a Bash/ToolSearch step is not seen.
 """
