@@ -68,3 +68,5 @@ tests/fixtures/transcript_dup.jsonl
 tests/fixtures/statusline_input.json
 tests/fixtures/subagents/agent-a.jsonl
 tests/fixtures/subagents/agent-a.meta.json
+VERSION
+CHANGELOG.md
