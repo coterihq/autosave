@@ -14,7 +14,7 @@ from pathlib import Path
 # version (e.g. Opus 4/4.1 were 15/75; Opus 4.5+ list at 5/25). Unknown models
 # fall back to the sonnet row. Add a row for any new tier you use.
 PRICES = {"opus": (5.0, 25.0), "sonnet": (3.0, 15.0), "haiku": (1.0, 5.0)}
-CACHE_READ_MULT, CACHE_WRITE_MULT = 0.1, 1.25
+CACHE_READ_MULT, CACHE_WRITE_MULT, CACHE_WRITE_1H_MULT = 0.1, 1.25, 2.0
 TIER_DOWN = {"opus": "sonnet", "sonnet": "haiku", "haiku": None}
 LEDGER = Path.home() / ".claude" / "usage" / "ledger.json"
 
@@ -24,9 +24,12 @@ def tier(model):
     return next((t for t in PRICES if t in m), "sonnet")
 
 
-def session_stats(transcript):
-    cost, last_ctx, model = 0.0, 0, ""
-    for line in Path(transcript).open():
+def _usage_by_message(path):
+    """Last usage per assistant message. Claude Code repeats one message's usage on several
+    transcript lines (one per content block), keyed by message.id + requestId; lines with
+    neither (older versions) each count once."""
+    seen, model, last_ctx = {}, "", 0
+    for i, line in enumerate(Path(path).open()):
         try:
             e = json.loads(line)
         except ValueError:
@@ -35,15 +38,32 @@ def session_stats(transcript):
         u = msg.get("usage")
         if e.get("type") != "assistant" or not u:
             continue
+        key = (msg.get("id"), e.get("requestId"))
         model = msg.get("model", model)
-        pin, pout = PRICES[tier(model)]
-        inp = u.get("input_tokens", 0)
-        cr = u.get("cache_read_input_tokens", 0)
-        cw = u.get("cache_creation_input_tokens", 0)
-        out = u.get("output_tokens", 0)
-        cost += (inp * pin + cr * pin * CACHE_READ_MULT
-                 + cw * pin * CACHE_WRITE_MULT + out * pout) / 1e6
-        last_ctx = inp + cr + cw
+        seen[key if any(key) else i] = (model, u)
+        last_ctx = (u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0)
+                    + u.get("cache_creation_input_tokens", 0))
+    return seen.values(), last_ctx, model
+
+
+def _price(model, u):
+    pin, pout = PRICES[tier(model)]
+    cw = u.get("cache_creation_input_tokens", 0)
+    cw_1h = min((u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens", 0) or 0, cw)
+    return (u.get("input_tokens", 0) * pin
+            + u.get("cache_read_input_tokens", 0) * pin * CACHE_READ_MULT
+            + (cw - cw_1h) * pin * CACHE_WRITE_MULT + cw_1h * pin * CACHE_WRITE_1H_MULT
+            + u.get("output_tokens", 0) * pout) / 1e6
+
+
+def session_stats(transcript):
+    """(cost USD, last context tokens, last model). Cost includes subagent transcripts in
+    <transcript dir>/<session>/subagents/*.jsonl; context and model come from the main one."""
+    transcript = Path(transcript)
+    entries, last_ctx, model = _usage_by_message(transcript)
+    cost = sum(_price(m, u) for m, u in entries)
+    for sub in sorted((transcript.parent / transcript.stem / "subagents").glob("*.jsonl")):
+        cost += sum(_price(m, u) for m, u in _usage_by_message(sub)[0])
     return cost, last_ctx, model
 
 

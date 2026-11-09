@@ -1,0 +1,5 @@
+{"type": "user", "message": {"content": "hi"}}
+{"type": "assistant", "message": {"model": "claude-sonnet-x", "usage": {"input_tokens": 1000000, "output_tokens": 100, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}, "id": "m1"}, "requestId": "r1"}
+{"type": "assistant", "message": {"model": "claude-sonnet-x", "usage": {"input_tokens": 1000000, "output_tokens": 200, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}, "id": "m1"}, "requestId": "r1"}
+{"type": "assistant", "message": {"model": "claude-sonnet-x", "usage": {"input_tokens": 1000000, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}, "id": "m2"}, "requestId": "r2"}
+{"type": "assistant", "message": {"model": "claude-sonnet-x", "usage": {"input_tokens": 1000000, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}}}

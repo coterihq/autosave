@@ -45,6 +45,26 @@ def test_output_cap_garbage_stdin_fails_open():
     assert r.returncode == 0
 
 
+# --- B2: count each assistant message once; include subagents ---
+import usage_guard as ug
+
+
+def test_session_stats_counts_each_message_once():
+    cost, _, _ = ug.session_stats(FIX / "transcript_dup.jsonl")
+    # 3 distinct messages x 1M input @ $3 = 9.00; outputs: m1 last=200 @ $15/M
+    assert abs(cost - (9.0 + 0.003)) < 1e-9, cost
+
+
+def test_session_stats_includes_subagents():
+    d = tmp_home(); t = d / "s1.jsonl"; shutil.copy(FIX / "transcript_dup.jsonl", t)
+    shutil.copytree(FIX / "subagents", d / "s1" / "subagents", dirs_exist_ok=True)
+    base, ctx, model = ug.session_stats(FIX / "transcript_dup.jsonl")
+    total, ctx2, model2 = ug.session_stats(t)
+    # agent-a.jsonl adds $3.00; agent-a.meta.json is not a transcript and must be ignored
+    assert abs(total - (base + 3.0)) < 1e-9, (base, total)
+    assert (ctx2, model2) == (ctx, model)
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
