@@ -112,7 +112,8 @@ def load_ledger(start, quarantine=True):
     if LEDGER.exists():
         try:
             led = json.loads(LEDGER.read_text())
-            if not isinstance(led, dict) or not isinstance(led.get("sessions", {}), dict):
+            if (not isinstance(led, dict) or not isinstance(led.get("sessions", {}), dict)
+                    or not all(isinstance(v, (int, float)) for v in led.get("sessions", {}).values())):
                 raise ValueError("not a ledger")
         except (ValueError, OSError):
             led = {}

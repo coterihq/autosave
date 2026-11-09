@@ -21,7 +21,8 @@ try:
     if (native_cost is None or pct is None) and tp and Path(tp).is_file():
         cost, ctx, model = ug.session_stats(tp)
     if native_cost is not None:
-        cost = float(native_cost)
+        # --resume restarts the native counter while the ledger keeps the full-history estimate.
+        cost = max(float(native_cost), led["sessions"].get(sid, 0.0))
     sessions = dict(led["sessions"]); sessions[sid] = cost
     spent = sum(sessions.values())
     pace = ug.pace_for(spent, budget, start, end, today)

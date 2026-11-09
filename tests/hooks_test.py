@@ -8,6 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 HOOKS = ROOT / "hooks"
 FIX = ROOT / "tests" / "fixtures"
 sys.path.insert(0, str(HOOKS))
+# Same config the hooks see under run_hook: none of your own CLAUDE_* settings.
+for _k in [k for k in os.environ if k.startswith("CLAUDE_")]:
+    del os.environ[_k]
 
 
 def tmp_home():
@@ -130,6 +133,27 @@ def test_price_rows_current_models():
     assert abs(ug._price("claude-opus-4-6", u) - (5 + 25 + 0.50)) < 1e-9     # older rows unchanged
     assert abs(ug._price("claude-sonnet-4-6", u) - (3 + 15 + 0.30)) < 1e-9
     assert ug.tier("claude-sonnet-5-5") == "sonnet"
+
+
+# --- final review fixes ---
+
+def test_statusline_resumed_session_keeps_ledger_cost():
+    # --resume: native cost restarts low while the ledger holds the full-history estimate
+    import datetime as dt
+    h = tmp_home(); led = h / ".claude/usage/ledger.json"; led.parent.mkdir(parents=True)
+    start, _ = ug.cycle_bounds(dt.date.today(), 1)
+    led.write_text(json.dumps({"cycle_start": start.isoformat(), "sessions": {"s": 50.0}}))
+    inp = json.loads((FIX / "statusline_input.json").read_text()); inp["transcript_path"] = ""
+    out = run_hook("usage_statusline.py", inp, h, env={"CLAUDE_MONTHLY_BUDGET_USD": "100"}).stdout
+    assert "$50/$100" in out, out
+
+
+def test_ledger_with_non_numeric_values_recovers():
+    import datetime as dt
+    start, _ = ug.cycle_bounds(dt.date.today(), 1)
+    r, led = _guard_run(tmp_home(), json.dumps({"cycle_start": start.isoformat(), "sessions": {"a": "1"}}))
+    r2, _ = _guard_run(led.parent.parent.parent)
+    assert "error" not in r.stdout + r2.stdout, r.stdout + r2.stdout
 
 
 if __name__ == "__main__":
