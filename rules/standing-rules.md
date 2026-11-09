@@ -16,8 +16,8 @@
   command, skill, connector or rule and how it improves the output. Skip on trivial
   asks or when nothing fits.
 - Cost pressure: flag when a thread gets long or tool use gets heavy, and recommend
-  dropping one model tier or starting a fresh thread with /handoff. (Enforced by
-  hooks/usage_guard.py.)
+  dropping one model tier or starting a fresh thread with /handoff. (hooks/usage_guard.py
+  warns you.)
 - Long threads: warn proactively and write a handoff to ~/.claude/handoffs/.
   Snapshot any live data with timestamps; the next session treats it as dated.
 - Hard controls: a block from hooks/guard.py means stop and ask {{APPROVER}},
