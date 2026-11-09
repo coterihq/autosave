@@ -5,7 +5,7 @@ description: Use when each component passes its own checks but the system fails 
 
 # Cross-Layer Contract Repair
 
-**Use when:** frontend, API, database, publisher/consumer, agent/tool or config/runtime each look correct alone and the failure appears at a seam. **Not for:** engineering:system-design (new design), engineering:testing-strategy (test planning) or migration-auditor (DB boundary only); this finds and repairs mismatched assumptions across seams.
+**Use when:** frontend, API, database, publisher/consumer, agent/tool or config/runtime each look correct alone and the failure appears at a seam. **Not for:** engineering:system-design (new design), engineering:testing-strategy (test planning) or /preflight (DB boundary only); this finds and repairs mismatched assumptions across seams.
 
 ## Contract
 - Inputs: a failing or suspect operation that crosses at least two layers, access to both sides of each seam.
@@ -25,7 +25,7 @@ One seam, one field: read both sides, state each side's assumption in a row, com
 6. **Contract lock**: add the narrowest test, type or check that fails on the next drift. Hands on: the test name and where it runs.
 
 ## Escalate if
-- The mismatch spans a DB schema change plus deployed readers (e.g. a readers-vs-row-cap mismatch, a signup trigger vs a dropped unique): call migration-auditor before any apply.
+- The mismatch spans a DB schema change plus deployed readers (e.g. a readers-vs-row-cap mismatch, a signup trigger vs a dropped unique): call /preflight before any apply.
 - Two owners claim the same contract, or neither does.
 - The repair order requires a window where old and new coexist in prod.
 

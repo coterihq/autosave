@@ -26,7 +26,7 @@ Private helper or leaf component: grep for callers and imports, list them, name 
 
 ## Escalate if
 - A consumer is outside the repo, in prod data, or unreachable by search: report Blocked on that consumer and cap the change to what is provable.
-- The change alters a persisted format or a DB object: use migration-auditor.
+- The change alters a persisted format or a DB object: use /preflight.
 - The impact spans more than one deployable surface: run /preflight too.
 
 ## Skip if

@@ -33,6 +33,8 @@ What happens:
   rule file with the same name as one of the kit's, yours is kept and the kit version
   is written beside it as `*.kit-new`. Files the kit installed earlier are updated
   in place (after a backup).
+- `rules/standing-rules.md` and `rules/workflow.md` never auto-update once yours
+  differ: newer kit versions land beside them as `.kit-new` for you to merge.
 - `CLAUDE.md` is created from the template if you have none; otherwise only a
   standing-rules block is appended (after a backup).
 - `settings.json` is merged, never replaced: missing env keys, hook entries and

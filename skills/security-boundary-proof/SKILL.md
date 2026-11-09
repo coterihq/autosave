@@ -5,7 +5,7 @@ description: Use when a feature touches identity, permissions, private data or e
 
 # Security Boundary Proof
 
-**Use when:** a change adds or alters who can see, change or trigger something, or sends data or actions outside the system. **Not for:** review (security/RLS/GRANT lens on a diff), engineering:code-review or migration-auditor (RLS and GRANT correctness); this proves the boundary holds under abuse, not that the diff reads well.
+**Use when:** a change adds or alters who can see, change or trigger something, or sends data or actions outside the system. **Not for:** review (security/RLS/GRANT lens on a diff), engineering:code-review or /preflight (RLS and GRANT correctness); this proves the boundary holds under abuse, not that the diff reads well.
 
 ## Contract
 - Inputs: the feature, its actors, the data and actions it exposes, read access to code and policy definitions.
