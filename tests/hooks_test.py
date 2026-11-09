@@ -98,6 +98,28 @@ def test_ledger_write_leaves_no_tmp():
     assert r.returncode == 0 and led.exists() and not list(led.parent.glob("ledger.json.tmp*"))
 
 
+# --- B1: statusline uses Claude Code's own session cost and context % ---
+
+def test_statusline_uses_native_cost_and_pct():
+    inp = json.loads((FIX / "statusline_input.json").read_text())
+    inp["transcript_path"] = str(FIX / "transcript_dup.jsonl")   # the estimate would be ~$9
+    out = run_hook("usage_statusline.py", inp, tmp_home(), env={"CLAUDE_MONTHLY_BUDGET_USD": "100"}).stdout
+    assert "$1/$100" in out and "ctx 42%" in out, out
+
+
+def test_statusline_falls_back_without_native_fields():
+    inp = {"session_id": "s", "transcript_path": str(FIX / "transcript_dup.jsonl"), "model": {"display_name": "Sonnet"}}
+    out = run_hook("usage_statusline.py", inp, tmp_home(), env={"CLAUDE_MONTHLY_BUDGET_USD": "100"}).stdout
+    assert "$9/$100" in out and "ctx " in out and "err" not in out, out
+
+
+def test_statusline_never_quarantines_ledger():
+    h = tmp_home(); led = h / ".claude/usage/ledger.json"; led.parent.mkdir(parents=True); led.write_text("{bad")
+    inp = json.loads((FIX / "statusline_input.json").read_text()); inp["transcript_path"] = ""
+    out = run_hook("usage_statusline.py", inp, h, env={"CLAUDE_MONTHLY_BUDGET_USD": "100"}).stdout
+    assert "err" not in out and led.read_text() == "{bad" and not list(led.parent.glob("*.corrupt-*")), out
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
