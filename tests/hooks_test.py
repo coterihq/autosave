@@ -120,6 +120,18 @@ def test_statusline_never_quarantines_ledger():
     assert "err" not in out and led.read_text() == "{bad" and not list(led.parent.glob("*.corrupt-*")), out
 
 
+# --- B: per-model list prices (Claude Code's native cost uses list price) ---
+
+def test_price_rows_current_models():
+    u = {"input_tokens": 1_000_000, "output_tokens": 1_000_000, "cache_read_input_tokens": 1_000_000}
+    assert abs(ug._price("claude-sonnet-5-5", u) - (2 + 10 + 0.20)) < 1e-9
+    assert abs(ug._price("claude-opus-5-5", u) - (4 + 20 + 0.20)) < 1e-9
+    assert abs(ug._price("claude-fable-5-1", u) - (10 + 50 + 0.25)) < 1e-9
+    assert abs(ug._price("claude-opus-4-6", u) - (5 + 25 + 0.50)) < 1e-9     # older rows unchanged
+    assert abs(ug._price("claude-sonnet-4-6", u) - (3 + 15 + 0.30)) < 1e-9
+    assert ug.tier("claude-sonnet-5-5") == "sonnet"
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
