@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 — 2026-11-09
+
+- `guard.py`: the live-mode block now catches quoted values (`DRY_RUN="false"`, `TESTNET='0'`), prefixed names (`BOT_DRY_RUN=false`), and `--live` followed by `;`, `&`, `|`, `)` or `=1`. `--live=false`, `DRY_RUN="true"` and quoted mentions still pass. A config file changed with an editor tool is still not covered.
+- `guard_tests.py`: 58 cases (12 new for the above).
+
 ## 1.2.0 — 2026-11-09
 
 Correctness release: every claim the kit makes about itself is now true and tested.
