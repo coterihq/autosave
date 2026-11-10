@@ -107,7 +107,7 @@ Nothing is evicted automatically.
 
 ## Failure handling
 
-- Both hooks exit 0 on any error, like every other Autosave hook.
+- Every Learn hook exits 0 on any error, like every other Autosave hook.
 - Ledger writes go to a temp file then `os.replace`, keeping one `.bak`.
 - A ledger that fails to parse is renamed `ledger.corrupt-<ts>.json`, a new
   empty one is started, and `/learn` says so. It is never silently reset.
