@@ -52,15 +52,26 @@ code.claude.com/docs/en/hooks and /memory, and against a real transcript:
 | 5 | `~/.claude/rules/*.md` loads with no import | Confirmed in practice (a session loaded three rules files, one in a subfolder, that no import names). Docs: loaded at launch. Reload after compaction: not stated |
 | 6 | `/bad` is recognisable in the transcript | Confirmed: the row is a string holding `<command-name>/bad</command-name>` and `<command-args>`, with `origin.kind = human` |
 
-Still open, each needs a two-minute live test as plan task 0:
+Live tests run 2026-11-10 (Claude Code 2.1.322, throwaway hooks loaded with
+`--settings`, headless `claude -p`):
 
-- Whether a SessionStart hook's JSON `systemMessage` is shown to the user. The
-  docs define the field as shown to the user but do not say so for
-  SessionStart. If it is not, batch mode's nudge moves to the Stop hook.
-- Whether hooks fire in headless (`claude -p`) runs. The recorder's origin
-  filter makes this harmless either way; the test only confirms it.
-- Whether a Bash call to `~/.claude/hooks/learn.py` raises a permission prompt
-  in each permission mode.
+- Hooks fire in headless runs: SessionStart (`source: startup`),
+  UserPromptSubmit and Stop all ran. Stop's input also carries `prompt_id`
+  (same value as UserPromptSubmit) and `last_assistant_message`. The headless
+  prompt's transcript row has `origin: null` and `promptSource: sdk`, so the
+  recorder's `origin.kind = human` filter excludes it.
+- A Bash call to a script is denied without an allow rule (interactively: a
+  permission prompt). With `Bash(python3 <path>/learn_stub.py:*)` it ran, but
+  only when the command was typed with the path unquoted; the same command
+  with the path in double quotes was still denied. So the injected line and
+  `commands/learn.md` give the exact unquoted command to run, and the allow
+  rule is optional: without it each approval shows one permission prompt.
+
+Still open (needs a person looking at the terminal, plan task 0): whether a
+SessionStart hook's JSON `systemMessage` is shown to the user. The headless
+stream carries it in the hook response, which does not show what the
+interactive UI prints. If it is not shown, batch mode's nudge moves to the
+Stop hook.
 
 ## Structure
 
