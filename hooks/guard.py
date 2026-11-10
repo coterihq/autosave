@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: hard controls Claude Code cannot talk itself past.
+"""PreToolUse guard: pattern-based hard controls for common risky commands (not a sandbox).
 Blocks: .env* modification, live-mode toggles (DRY_RUN/TESTNET=false, --live),
 destructive prod DB ops (supabase db reset/push, MCP apply_migration), rm -rf on
 root-level dirs, and two self-fixable shell footguns (self-matching wait loops,
@@ -214,10 +214,9 @@ if tool == "Bash":
               f"pass the glob/paths directly. Fix and rerun; no approval needed.", file=sys.stderr)
         sys.exit(2)
 
-# --- Supabase MCP apply_migration: same prod write as `supabase db push`, minus migration-auditor
-#     and /preflight. Rule 3 only sees Bash, so it never saw this path . ---
+# --- Supabase MCP apply_migration: same prod write as `supabase db push`, minus /preflight. Rule 3 only sees Bash, so it never saw this path . ---
 if re.fullmatch(r"mcp__.+__apply_migration", tool):
     deny("Supabase MCP apply_migration writes schema to the linked (prod) project, bypassing "
-         "migration-auditor and /preflight.")
+         "/preflight.")
 
 sys.exit(0)

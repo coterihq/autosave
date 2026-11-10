@@ -10,14 +10,14 @@
   "Tooling rec:" line naming the command, skill, connector or rule already installed
   that would have improved the output (or did) and how. Skip on trivial replies;
   never pad with a generic pick. If that tool is read-only and runnable now, run it
-  and fold in the result instead of only recommending it. (Enforced by
-  hooks/footer_check.py.)
+  and fold in the result instead of only recommending it. (Optional:
+  hooks/footer_check.py, off by default.)
 - Tooling pre-flight: before a substantive task, name in one line the best-fit
   command, skill, connector or rule and how it improves the output. Skip on trivial
   asks or when nothing fits.
 - Cost pressure: flag when a thread gets long or tool use gets heavy, and recommend
-  dropping one model tier or starting a fresh thread with /handoff. (Enforced by
-  hooks/usage_guard.py.)
+  dropping one model tier or starting a fresh thread with /handoff. (hooks/usage_guard.py
+  warns you.)
 - Long threads: warn proactively and write a handoff to ~/.claude/handoffs/.
   Snapshot any live data with timestamps; the next session treats it as dated.
 - Hard controls: a block from hooks/guard.py means stop and ask {{APPROVER}},

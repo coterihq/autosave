@@ -10,8 +10,9 @@ CAP = re.compile(r"\|\s*(head|tail|wc|grep\s+-c|cut|sort\s+.*\|\s*head)|--max-co
 try:
     cmd = (json.load(sys.stdin).get("tool_input") or {}).get("command", "")
     if BIG.search(cmd) and not CAP.search(cmd):
-        print(json.dumps({"systemMessage":
+        # additionalContext reaches Claude; systemMessage only reaches the user.
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext":
             "[bash_output_cap] No output cap on a likely-large command. "
-            "Add | head -50, | tail -50, | wc -l, or LIMIT — every byte stays in context and is re-read each turn."}))
+            "Add | head -50, | tail -50, | wc -l, or LIMIT — every byte stays in context and is re-read each turn."}}))
 except Exception:
     pass

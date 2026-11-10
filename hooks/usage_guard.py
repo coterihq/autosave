@@ -14,7 +14,16 @@ from pathlib import Path
 # version (e.g. Opus 4/4.1 were 15/75; Opus 4.5+ list at 5/25). Unknown models
 # fall back to the sonnet row. Add a row for any new tier you use.
 PRICES = {"opus": (5.0, 25.0), "sonnet": (3.0, 15.0), "haiku": (1.0, 5.0)}
-CACHE_READ_MULT, CACHE_WRITE_MULT = 0.1, 1.25
+# Model-specific list prices, checked first, first match wins (list price as of 2026-10):
+# (model id substring, input, output, cache read). Claude Code's own session cost uses
+# list price, so these keep the estimate in line with it.
+MODEL_PRICES = [
+    ("fable-5", 10.0, 50.0, 0.25), ("mythos-5", 10.0, 50.0, 0.25),
+    ("opus-5-5", 4.0, 20.0, 0.20),
+    ("sonnet-5", 2.0, 10.0, 0.20),          # Sonnet 5 and 5.5
+    ("haiku-5-5", 0.10, 0.50, 0.01),        # prompts up to 100K tokens
+]
+CACHE_READ_MULT, CACHE_WRITE_MULT, CACHE_WRITE_1H_MULT = 0.1, 1.25, 2.0
 TIER_DOWN = {"opus": "sonnet", "sonnet": "haiku", "haiku": None}
 LEDGER = Path.home() / ".claude" / "usage" / "ledger.json"
 
@@ -24,9 +33,12 @@ def tier(model):
     return next((t for t in PRICES if t in m), "sonnet")
 
 
-def session_stats(transcript):
-    cost, last_ctx, model = 0.0, 0, ""
-    for line in Path(transcript).open():
+def _usage_by_message(path):
+    """Last usage per assistant message. Claude Code repeats one message's usage on several
+    transcript lines (one per content block), keyed by message.id + requestId; lines with
+    neither (older versions) each count once."""
+    seen, model, last_ctx = {}, "", 0
+    for i, line in enumerate(Path(path).open()):
         try:
             e = json.loads(line)
         except ValueError:
@@ -35,15 +47,42 @@ def session_stats(transcript):
         u = msg.get("usage")
         if e.get("type") != "assistant" or not u:
             continue
+        key = (msg.get("id"), e.get("requestId"))
         model = msg.get("model", model)
-        pin, pout = PRICES[tier(model)]
-        inp = u.get("input_tokens", 0)
-        cr = u.get("cache_read_input_tokens", 0)
-        cw = u.get("cache_creation_input_tokens", 0)
-        out = u.get("output_tokens", 0)
-        cost += (inp * pin + cr * pin * CACHE_READ_MULT
-                 + cw * pin * CACHE_WRITE_MULT + out * pout) / 1e6
-        last_ctx = inp + cr + cw
+        seen[key if any(key) else i] = (model, u)
+        last_ctx = (u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0)
+                    + u.get("cache_creation_input_tokens", 0))
+    return seen.values(), last_ctx, model
+
+
+def model_prices(model):
+    """(input, output, cache read) $/MTok for a model id."""
+    m = (model or "").lower()
+    for key, pin, pout, pread in MODEL_PRICES:
+        if key in m:
+            return pin, pout, pread
+    pin, pout = PRICES[tier(model)]
+    return pin, pout, pin * CACHE_READ_MULT
+
+
+def _price(model, u):
+    pin, pout, pread = model_prices(model)
+    cw = u.get("cache_creation_input_tokens", 0)
+    cw_1h = min((u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens", 0) or 0, cw)
+    return (u.get("input_tokens", 0) * pin
+            + u.get("cache_read_input_tokens", 0) * pread
+            + (cw - cw_1h) * pin * CACHE_WRITE_MULT + cw_1h * pin * CACHE_WRITE_1H_MULT
+            + u.get("output_tokens", 0) * pout) / 1e6
+
+
+def session_stats(transcript):
+    """(cost USD, last context tokens, last model). Cost includes subagent transcripts in
+    <transcript dir>/<session>/subagents/*.jsonl; context and model come from the main one."""
+    transcript = Path(transcript)
+    entries, last_ctx, model = _usage_by_message(transcript)
+    cost = sum(_price(m, u) for m, u in entries)
+    for sub in sorted((transcript.parent / transcript.stem / "subagents").glob("*.jsonl")):
+        cost += sum(_price(m, u) for m, u in _usage_by_message(sub)[0])
     return cost, last_ctx, model
 
 
@@ -66,11 +105,31 @@ def cycle_bounds(today, start_day):
     return start, end
 
 
-def load_ledger(start):
-    led = json.loads(LEDGER.read_text()) if LEDGER.exists() else {}
+def load_ledger(start, quarantine=True):
+    """Ledger for this cycle. An unreadable ledger (bad JSON, empty file) starts fresh; with
+    quarantine=True it is first renamed to ledger.json.corrupt-<time> so it errors only once."""
+    led = {}
+    if LEDGER.exists():
+        try:
+            led = json.loads(LEDGER.read_text())
+            if (not isinstance(led, dict) or not isinstance(led.get("sessions", {}), dict)
+                    or not all(isinstance(v, (int, float)) for v in led.get("sessions", {}).values())):
+                raise ValueError("not a ledger")
+        except (ValueError, OSError):
+            led = {}
+            if quarantine:
+                LEDGER.replace(LEDGER.with_name(f"ledger.json.corrupt-{dt.datetime.now():%Y%m%d%H%M%S}"))
     if led.get("cycle_start") != start.isoformat():
         led = {"cycle_start": start.isoformat(), "sessions": {}}
     return led
+
+
+def save_ledger(led):
+    """Write via a temp file + os.replace so a concurrent reader never sees half a ledger."""
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    tmp = LEDGER.with_name(f"ledger.json.tmp-{os.getpid()}")
+    tmp.write_text(json.dumps(led, indent=1))
+    os.replace(tmp, LEDGER)
 
 
 def pace_for(spent, budget, start, end, today):
@@ -131,10 +190,9 @@ def main():
     cost, ctx, model = session_stats(tp)
     today = dt.date.today()
     start, end = cycle_bounds(today, start_day)
-    LEDGER.parent.mkdir(parents=True, exist_ok=True)
     led = load_ledger(start)
     led["sessions"][hook.get("session_id", tp.stem)] = round(cost, 4)
-    LEDGER.write_text(json.dumps(led, indent=1))
+    save_ledger(led)
     spent = sum(led["sessions"].values())
     pace = pace_for(spent, budget, start, end, today)
     msgs, t = [], tier(model)

@@ -1,7 +1,7 @@
 # Autosave for Claude Code
 
-A tested operating layer for Claude Code: safety hooks that the model cannot talk its
-way past, compaction and handoff tooling so long sessions don't lose the plot, a
+A tested operating layer for Claude Code: safety hooks that block common forms of risky
+commands (pattern-based, not a sandbox), compaction and handoff tooling so long sessions don't lose the plot, a
 spend/pace guard, a standing-rules system that stays in sync with CLAUDE.md, slash
 commands for routine ops, and 25 evidence-first engineering skills.
 
@@ -32,12 +32,12 @@ Requirements: Claude Code, Python 3.9+, bash. Tested on macOS (zsh). Linux shoul
 | Hook | Event | What it does | Why |
 |---|---|---|---|
 | `guard.py` | PreToolUse (Write/Edit, Bash, MCP `apply_migration`) | Blocks: edits or shell writes to `.env*` (examples/templates allowed); live-mode toggles (`DRY_RUN=false`, `*TESTNET=false`, `--live`); `supabase db reset/push` against a linked project, plus any project wrapper you list in `CLAUDE_GUARD_DB_WRAPPERS`; Supabase MCP `apply_migration`; `rm -rf` on `/`, `~`, `$HOME`, their `/*`, or `~/.claude`. Quoted text (a grep pattern, a commit message) is not treated as a use. Also blocks two self-fixable shell bugs: a wait loop that greps the process table and matches itself forever, and, when your shell is zsh, an unquoted multi-value `$var` (zsh does not word-split, so the command silently acts on nothing). The `DRY_RUN`/`TESTNET`/`--live` and Supabase rules only fire if you use those; they never get in the way otherwise. | An exit code 2 stops the call no matter what the model decides. Fails open on parse errors, and every hook command exits 0 if its file is missing, so a broken or deleted guard never blocks a session. |
-| `guard_tests.py` | manual / installer | 41 regression cases for `guard.py`; each block must fail for the intended reason. | Run after editing the guard. |
+| `guard_tests.py` | manual / installer | 46 regression cases for `guard.py`; each block must fail for the intended reason. | Run after editing the guard. |
 | `bash_output_cap.py` | PreToolUse (Bash) | Warns (never blocks) when a likely-huge command (`cat`, `rg`, `git log`, `curl`...) has no `head`/`tail`/`wc`/`LIMIT`. | Every byte of output is re-read on each turn; this is the cheapest context saving there is. |
 | `migration_check.py` | PostToolUse | After writing `supabase/migrations/*.sql`, flags any `CREATE TABLE/VIEW/FUNCTION` without a matching `GRANT`. | RLS alone does not expose objects to PostgREST; missing GRANTs cause 42501 errors in prod. Harmless if you don't use Supabase. |
 | `precompact_dump.py` | PreCompact | Injects non-negotiable preservation instructions into the compaction prompt and logs the event. | Survival rules fire even when CLAUDE.md has been drowned out. |
 | `session_inject.py` | SessionStart (compact, resume) | Re-injects `docs/ai/state/session-critical.md` (project) or `~/.claude/state/session-critical.md`, with a staleness warning past 24h. | Compaction silently drops objectives; this puts them back mechanically. |
-| `footer_check.py` | Stop | Off by default (`FOOTER_DISABLE=0` turns it on). When on, substantive replies (>1200 chars) must include a "Tooling rec:" line; it nudges once and never loops. Each nudge costs one extra turn. | Surfaces the commands/skills you already own instead of letting them rot. |
+| `footer_check.py` | Stop | When enabled (off by default; `FOOTER_DISABLE=0` turns it on). When on, substantive replies (>1200 chars) must include a "Tooling rec:" line; it nudges once and never loops. Each nudge costs one extra turn. | Surfaces the commands/skills you already own instead of letting them rot. |
 | `usage_guard.py` | Stop | Estimates spend from local transcripts into `~/.claude/usage/ledger.json`, computes pace vs budget, warns at 0.8x, recommends dropping a model tier at 1.0x, and above 150k context writes one deterministic handoff to `~/.claude/handoffs/`. | Keeps you inside plan limits and turns long sessions into clean restarts. |
 | `usage_statusline.py` | statusLine | `model · pace · $spent/$budget · ctx` | Live pace without asking. |
 | `usage_digest.py` | cron (optional) | Weekly markdown digest: spend, pace, spend by tier, top 3 sessions. `--notes` also posts to Apple Notes on macOS. | Feeds `/claude-audit`. |
@@ -133,6 +133,10 @@ compaction breadcrumb, audit log), `~/.claude/usage/` (ledger, digests),
    manifest itself. Skills and commands keep loading until you do.
 
 Either order is safe: a hook whose file is gone exits 0 and lets the call through.
+
+## More from Coteri
+
+Code Red ($9) adds plan red-teaming and a reviewed parallel-agent coordination workflow; Quick Save ($5) checks that the served build contains the commit you shipped. Both at https://coterihq.gumroad.com.
 
 ## License
 

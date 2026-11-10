@@ -65,18 +65,31 @@ cases = [
  (0, None, 'while read -r l; do echo "$l"; done < f.txt; grep -rn "ps aux | grep foo" docs/'),
  # ps|grep in a loop BODY is not a wait condition and cannot hang on itself.
  (0, None, 'while true; do ps -eo command | grep foo; sleep 1; done'),
+
+ # --- non-Bash tools: a dict is sent as the full hook payload ---
+ (2, ".env", {"tool_name": "Write", "tool_input": {"file_path": "/p/.env", "content": "X=1"}}),
+ (0, None, {"tool_name": "Write", "tool_input": {"file_path": "/p/.env.example", "content": "X="}}),
+ (2, ".env", {"tool_name": "Edit", "tool_input": {"file_path": "/p/.env.local", "old_string": "a", "new_string": "b"}}),
+ (2, ".env", {"tool_name": "MultiEdit", "tool_input": {"file_path": "/p/.env", "edits": [{"old_string": "a", "new_string": "b"}]}}),
+ (2, "apply_migration", {"tool_name": "mcp__supabase__apply_migration", "tool_input": {"name": "x", "query": "select 1"}}),
 ]
 
-bad = 0
-for want, reason, c, *shell in cases:
-    env = dict(os.environ, SHELL=shell[0] if shell else "/bin/zsh")
-    r = subprocess.run([sys.executable, GUARD],
-                       input=json.dumps({"tool_name": "Bash", "tool_input": {"command": c}}),
-                       capture_output=True, text=True, env=env)
-    ok = r.returncode == want and (reason is None or reason in r.stderr)
-    if not ok:
-        bad += 1
-    detail = "" if ok else f"  <- got {r.returncode} want {want}" + (f", reason missing {reason!r}" if reason and reason not in r.stderr else "")
-    print(("OK  " if ok else "BAD ") + c[:66].replace("\n", " ") + detail)
-print(f"\n{len(cases) - bad}/{len(cases)} pass")
-raise SystemExit(1 if bad else 0)
+def main():
+    bad = 0
+    for want, reason, c, *shell in cases:
+        env = dict(os.environ, SHELL=shell[0] if shell else "/bin/zsh")
+        payload = c if isinstance(c, dict) else {"tool_name": "Bash", "tool_input": {"command": c}}
+        label = c if isinstance(c, str) else json.dumps(c)
+        r = subprocess.run([sys.executable, GUARD], input=json.dumps(payload),
+                           capture_output=True, text=True, env=env)
+        ok = r.returncode == want and (reason is None or reason in r.stderr)
+        if not ok:
+            bad += 1
+        detail = "" if ok else f"  <- got {r.returncode} want {want}" + (f", reason missing {reason!r}" if reason and reason not in r.stderr else "")
+        print(("OK  " if ok else "BAD ") + label[:66].replace("\n", " ") + detail)
+    print(f"\n{len(cases) - bad}/{len(cases)} pass")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

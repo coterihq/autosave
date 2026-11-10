@@ -25,7 +25,7 @@ One recurring co-change cluster with an obvious owner: name the cluster, name th
 6. **Behavior equivalence**: tests or recorded outputs that must match before and after; run them before the first step to confirm a baseline. Hands on: equivalence set and result.
 
 ## Escalate if
-- The seam crosses a DB schema or API contract: also use change-impact-recon and migration-auditor.
+- The seam crosses a DB schema or API contract: also use change-impact-recon and /preflight.
 - Equivalence cannot be established: report Blocked, do not extract.
 
 ## Skip if
