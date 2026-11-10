@@ -38,28 +38,29 @@ corrections with receipts, not a verdict machine. The README says so.
 - No `/good` command: nothing would read it.
 - English-only, opening-phrase detector in v1.
 
-## To confirm first (plan task 0)
+## Hook behaviour: checked 2026-11-10
 
-Rev 1 got Claude Code's hook behaviour wrong from memory. These claims come
-from the reviewer's reading of the hooks and memory docs. The plan's first task
-re-reads those docs and records the result here before any code is written:
+Rev 1 got Claude Code's hook behaviour wrong from memory. Checked against
+code.claude.com/docs/en/hooks and /memory, and against a real transcript:
 
-1. UserPromptSubmit stdin carries no message uuid; transcript writes may lag.
-2. UserPromptSubmit also fires for non-typed prompts (scheduled tasks,
-   subagent reports, cross-session messages).
-3. SessionStart stdout goes to the model, not the user; a JSON `systemMessage`
-   reaches the user; a `startup` matcher exists.
-4. `~/.claude/rules/*.md` loads automatically with no `@` import, at session
-   start and again after compaction.
-5. Unknown: whether hooks fire in headless (`-p`) runs, and whether a Bash
-   call to `~/.claude/hooks/learn.py` raises a permission prompt in each
-   permission mode.
+| # | Claim | Result |
+|---|---|---|
+| 1 | UserPromptSubmit stdin has no message uuid | Confirmed. It does carry `prompt_id`, and transcript user rows carry the same value as `promptId` (42 of 42 rows in one session) |
+| 2 | The transcript may lag | Confirmed: "written asynchronously and may lag" |
+| 3 | UserPromptSubmit fires for non-typed prompts | Confirmed: scheduled tasks, background subagent reports, other sessions. Also fires for slash commands. Inside a subagent the input carries `agent_id` |
+| 4 | SessionStart stdout goes to the model; `startup` matcher exists | Confirmed |
+| 5 | `~/.claude/rules/*.md` loads with no import | Confirmed in practice (a session loaded three rules files, one in a subfolder, that no import names). Docs: loaded at launch. Reload after compaction: not stated |
+| 6 | `/bad` is recognisable in the transcript | Confirmed: the row is a string holding `<command-name>/bad</command-name>` and `<command-args>`, with `origin.kind = human` |
 
-6. Unknown: how a `/bad` invocation appears in transcript rows, which the
-   recorder depends on. Check a real transcript.
+Still open, each needs a two-minute live test as plan task 0:
 
-If 1 to 4 turn out different, or 6 shows `/bad` cannot be recognised from the
-transcript, stop and revise this spec.
+- Whether a SessionStart hook's JSON `systemMessage` is shown to the user. The
+  docs define the field as shown to the user but do not say so for
+  SessionStart. If it is not, batch mode's nudge moves to the Stop hook.
+- Whether hooks fire in headless (`claude -p`) runs. The recorder's origin
+  filter makes this harmless either way; the test only confirms it.
+- Whether a Bash call to `~/.claude/hooks/learn.py` raises a permission prompt
+  in each permission mode.
 
 ## Structure
 
@@ -102,21 +103,21 @@ active_days[]: ISO dates with at least one real user turn
 last_nudge:    ISO date
 ```
 
-- `key` is the transcript row's prompt id, or sha1(session_id + text) when the
-  row has none.
+- `key` is the transcript row's `promptId` (the hook's `prompt_id`), or
+  sha1(session_id + text) when a row has none.
 - Text that trips `guard.py`'s credential-shape check is stored as
   `[redacted]`.
 
 ## Recorder (`record`, on Stop, both modes)
 
 1. Read the current session's transcript rows. Keep real user turns only:
-   not meta, not sidechain, not tool results, not injected text, not
-   scheduled or agent-originated prompts.
+   `origin.kind` is `human`, not meta, not sidechain, not tool results, not
+   injected text.
 2. A kept turn is a correction when it opens with: no (not "no problem" / "no
    worries"), nope, wrong, undo, revert, redo, not that, that's not; or when
    it is a `/bad` invocation (source `bad`).
-3. Skip any turn whose text hash is in this session's offer file as a consumed
-   answer.
+3. Skip any turn whose `promptId` is in this session's offer file as a
+   consumed answer.
 4. Insert corrections whose `key` is new. Re-running on the same transcript
    adds nothing. A row the transcript had not flushed yet is picked up by the
    next Stop.
@@ -129,7 +130,8 @@ atomic replace, one `.bak`). The file is only rewritten when something changed.
 
 ## Offerer (`offer`, on UserPromptSubmit, moment mode only)
 
-- Offer file says an offer is open: record this prompt's text hash as a
+- Input carries `agent_id` (a subagent): exit, inject nothing.
+- Offer file says an offer is open: record this prompt's `prompt_id` as a
   consumed answer, close the offer, inject nothing. This is what stops a "no"
   answer from being detected as a new correction.
 - Otherwise, if the prompt opens with a detector phrase: mark an offer open and
