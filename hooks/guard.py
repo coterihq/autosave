@@ -91,12 +91,16 @@ if tool == "Bash":
     # ponytail: misses a toggle hidden inside `bash -c '...'`; parse -c bodies if that shows up.
     written = re.search(r">\s*(\S+)\s*<<-?\s*['\"]?\w+", cmd)
     writes_and_runs = bool(written and re.search(r"\b(?:ba|z)?sh\s+" + re.escape(written.group(1)) + r"\b", cmd))
-    code = _code_only(cmd if writes_and_runs else _drop_data_heredocs(cmd))
+    scan = cmd if writes_and_runs else _drop_data_heredocs(cmd)
+    code = _code_only(scan)
 
     # 2. Live-mode toggles: never flipped by model judgment
-    if re.search(r"\bDRY_RUN\s*=\s*(false|0)\b", code, re.I) or \
-       re.search(r"\b(\w+_)?TESTNET\s*=\s*(false|0)\b", code, re.I) or \
-       re.search(r"\s--live(\s|$)", code):
+    #    The NAME= must be outside quotes (in `code`); its value is read from `scan` at the same
+    #    offset, since `_code_only` keeps length, so DRY_RUN="false" counts and a quoted mention doesn't.
+    off_value = re.compile(r"""["']?(false|0)["']?(?!\w)""", re.I)
+    if any(off_value.match(scan, m.end())
+           for m in re.finditer(r"\b(\w+_)?(DRY_RUN|TESTNET)\s*=\s*", code, re.I)) or \
+       re.search(r"(?:^|[\s(;&|])--live(?=$|[\s;&|)>]|=(?!(?:false|0)\b))", code):
         deny("live-mode toggle detected (DRY_RUN/TESTNET=false or --live).")
 
     # 3. Destructive prod DB ops. Project wrappers that push to prod under another name
