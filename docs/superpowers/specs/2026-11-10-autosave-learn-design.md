@@ -118,6 +118,7 @@ Rev 2.1 corrections, found when reading the code for the plan:
   correction.
 - Rule text is refused when it contains an `@path` anywhere, not only at the start, because memory files treat it as an import.
 - The offer is two-phase: `asked_pending` becomes `open` only after Stop sees the exact question, so an interrupted turn cannot swallow the next correction.
+- The offer line carries the correction's key and approval happens on the user's answer turn, because the correction is recorded at Stop, after the reply that asks.
 
 ## Data (`learn.json`)
 

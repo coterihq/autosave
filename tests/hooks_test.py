@@ -337,11 +337,13 @@ def test_learn_concurrent_approve_at_cap():
 def test_learn_kill_report():
     good = _st(*[{} for _ in range(5)],
                corrections=[{"key": "a", "state": "ruled"}, {"key": "b", "state": "dismissed"}, {"key": "c", "state": "repeat"}])
-    lines = [l for l in learn.status(good, "2026-11-10", kill=True).splitlines() if l.startswith(("PASS", "FAIL"))]
+    with _home(tmp_home()):
+        lines = [l for l in learn.status(good, "2026-11-10", kill=True).splitlines() if l.startswith(("PASS", "FAIL"))]
     assert len(lines) == 4 and all(l.startswith("PASS") for l in lines), lines
     bad = _st({}, corrections=[{"key": "a", "state": "ruled"}] + [{"key": "d%d" % i, "state": "dismissed"} for i in range(5)] + [{"key": "a"}],
               quarantined=1)
-    lines = [l for l in learn.status(bad, "2026-11-10", kill=True).splitlines() if l.startswith(("PASS", "FAIL"))]
+    with _home(tmp_home()):
+        lines = [l for l in learn.status(bad, "2026-11-10", kill=True).splitlines() if l.startswith(("PASS", "FAIL"))]
     assert len(lines) == 4 and all(l.startswith("FAIL") for l in lines), lines
 
 
@@ -351,8 +353,9 @@ def test_learn_output_never_says_proven_or_works():
     st = _st({"state": "held", "receipts": ["k"]}, {"state": "failed", "repeats": ["a", "b"]},
              corrections=[{"key": "k", "text": "nope", "prev_reply": "done"}, {"key": "z", "state": "repeat", "rule_id": 1}],
              quarantined=1, days=["2026-11-02"])
-    out = "\n".join([learn.render_rules(st), learn.status(st, "2026-11-10", kill=True), learn.pending(st),
-                     learn.approve(st, "k", "x" * 201, "2026-11-10")[1], learn.retire(st, 99)[1]])
+    with _home(tmp_home()):
+        out = "\n".join([learn.render_rules(st), learn.status(st, "2026-11-10", kill=True), learn.pending(st),
+                         learn.approve(st, "k", "x" * 201, "2026-11-10")[1], learn.retire(st, 99)[1], learn.ANSWER_LINE, learn.OFFER_LINE])
     assert not re.search(r"\b(proven|works)\b", out, re.I), out
 
 
@@ -391,13 +394,18 @@ def test_learn_off_by_default_is_silent():
     assert r.returncode == 0 and r.stdout == "" and not (home / ".claude" / "learn").exists()
 
 
+def _answer_ok(out):
+    """The answer prompt gets the answer line, never a fresh offer."""
+    assert "the user is answering your rule question" in out and "may be a correction" not in out, out
+
+
 def test_learn_offer_then_no_is_consumed():
     home = tmp_home()
     tp = _transcript(home, "t.jsonl", [("p1", "no, wrong")])
     r = run_hook("learn.py", _ups("p1", "no, wrong"), home, LON)
-    assert "Save this as a rule?" in r.stdout and str(HOOKS / "learn.py") in r.stdout
+    assert "Save this as a rule?" in r.stdout and "~/.claude/hooks/learn.py" in r.stdout
     run_hook("learn.py", _stop("p1", "Save this as a rule? Proposed: use tabs", tp), home, LON)
-    assert run_hook("learn.py", _ups("p2", "no"), home, LON).stdout == ""
+    _answer_ok(run_hook("learn.py", _ups("p2", "no"), home, LON).stdout)
     _transcript(home, "t.jsonl", [("p1", "no, wrong"), ("p2", "no")])
     run_hook("learn.py", _stop("p2", "ok", tp), home, LON)
     assert [c["key"] for c in _state(home)["corrections"]] == ["p1"]
@@ -448,12 +456,12 @@ def _asked_without_offer(env):
 
 def test_learn_question_without_offer_then_no_is_consumed():
     out, keys = _asked_without_offer(LON)
-    assert out == "" and "p2" not in keys, (out, keys)
+    _answer_ok(out); assert "p2" not in keys, keys
 
 
 def test_learn_batch_mode_answer_is_consumed():
     out, keys = _asked_without_offer(dict(LON, CLAUDE_LEARN_MODE="batch"))
-    assert out == "" and "p2" not in keys, (out, keys)
+    _answer_ok(out); assert "p2" not in keys, keys
 
 
 def test_learn_double_stop_keeps_offer():
@@ -461,7 +469,7 @@ def test_learn_double_stop_keeps_offer():
     assert "Save this as a rule?" in run_hook("learn.py", _ups("p1", "no, wrong"), home, LON).stdout
     run_hook("learn.py", _stop("p1", "Fixed."), home, LON)
     run_hook("learn.py", _stop("p1", "Save this as a rule? Proposed: use tabs"), home, LON)
-    assert run_hook("learn.py", _ups("p2", "no"), home, LON).stdout == ""
+    _answer_ok(run_hook("learn.py", _ups("p2", "no"), home, LON).stdout)
     tp = _transcript(home, "t.jsonl", [("p1", "no, wrong"), ("p2", "no")])
     run_hook("learn.py", _stop("p2", "ok", tp), home, LON)
     assert [c["key"] for c in _state(home)["corrections"]] == ["p1"]
@@ -536,7 +544,7 @@ def test_learn_dismiss_ruled_key_refused():
 def test_learn_rule_text_rejects_at_path_anywhere():
     st = _st(corrections=_pend("k1"))
     ok, msg = learn.approve(st, "k1", "always read @~/notes.md first", "2026-11-10")
-    assert not ok and msg == "rule text must be one line, max 200 characters, not starting with # and with no @path"
+    assert not ok and msg == "rule text must be one line, max 200 characters, not starting with # and with no @path and no credentials"
     assert learn.clean_rule("mail a@b.com") == "mail a@b.com" and learn.clean_rule("@x") is None
 
 
@@ -553,6 +561,75 @@ def test_learn_cli_argument_error_exits_zero():
         [sys.executable, str(HOOKS / "learn.py"), "retire", "--rule", "notanumber"], capture_output=True, text=True,
         env=dict(os.environ, HOME=str(tmp_home())))
     assert r.returncode == 0 and "usage" in r.stdout.lower(), (r.returncode, r.stdout, r.stderr)
+
+
+# --- Learn: final review fix wave ---
+def _cli(home, *args):
+    return subprocess.run([sys.executable, str(HOOKS / "learn.py"), *args], capture_output=True, text=True,
+                          env=dict(os.environ, HOME=str(home)))
+
+
+def test_learn_offer_carries_key_and_forbids_approve():
+    out = run_hook("learn.py", _ups("p1", "no, wrong"), tmp_home(), LON).stdout
+    assert "key p1" in out and "approve --key" not in out and "~/.claude/hooks/learn.py" in out, out
+
+
+def test_learn_approve_on_answer_turn_full_flow():
+    home = tmp_home()
+    tp = _transcript(home, "t.jsonl", [("p1", "no, wrong")])
+    run_hook("learn.py", _ups("p1", "no, wrong"), home, LON)
+    run_hook("learn.py", _stop("p1", "Fixed. Save this as a rule? Proposed: Use tabs", tp), home, LON)
+    out = run_hook("learn.py", _ups("p2", "yes"), home, LON).stdout
+    assert "approve --key p1" in out, out
+    r = _cli(home, "approve", "--key", "p1", "--text", "Use tabs")
+    assert r.returncode == 0, r
+    tp = _transcript(home, "t.jsonl", [("p1", "no, wrong"), ("p2", "yes")])
+    run_hook("learn.py", _stop("p2", "ok", tp), home, LON)
+    st = _state(home)
+    assert len(st["rules"]) == 1 and st["rules"][0]["receipts"] == ["p1"]
+    assert [c["key"] for c in st["corrections"]] == ["p1"]
+
+
+def test_learn_unknown_key_says_not_recorded_yet():
+    home = tmp_home()
+    for args in (("approve", "--key", "nope", "--text", "x"), ("dismiss", "--key", "nope"), ("repeat", "--key", "nope", "--rule", "1")):
+        r = _cli(home, *args)
+        assert "is recorded yet" in r.stdout and "answer again after your next reply" in r.stdout, r.stdout
+    assert _state(home)["rules"] == []
+
+
+def test_learn_quarantine_survives_read_and_fails_kill_check():
+    home = tmp_home(); d = home / ".claude" / "learn"; d.mkdir(parents=True)
+    (d / "learn.json").write_text("{not json")
+    assert "damaged state file" in _cli(home, "pending").stdout
+    assert "damaged state file" in _cli(home, "pending").stdout
+    line = [l for l in _cli(home, "status", "--kill").stdout.splitlines() if l.startswith(("PASS", "FAIL")) and "state intact" in l]
+    assert line and line[0].startswith("FAIL"), line
+
+
+def test_learn_rule_text_with_credential_refused():
+    st = _st(corrections=_pend("k1"))
+    ok, msg = learn.approve(st, "k1", "use api_key=abcd1234efgh in calls", "2026-11-10")
+    assert not ok and "no credentials" in msg and st["rules"] == []
+
+
+def test_learn_state_dir_mode_700():
+    home = tmp_home()
+    with _home(home):
+        learn.mutate(lambda s: (True, s["active_days"].append("2026-11-10")))
+    assert (home / ".claude" / "learn").stat().st_mode & 0o777 == 0o700
+
+
+def test_learn_failed_rule_rewrite_via_repeat_key():
+    st = _st({}, corrections=_pend("a", "b"))
+    learn.repeat(st, "a", 1); learn.repeat(st, "b", 1)
+    assert st["rules"][0]["state"] == "failed"
+    out = learn.pending(st)
+    assert "Failed rules (offer one rewrite each)" in out and "key=b" in out and "r1" in out
+    ok, _ = learn.approve(st, "b", "better rewrite", "2026-11-10")
+    assert ok and st["rules"][0]["state"] == "failed" and st["rules"][1]["state"] == "trial"
+    assert st["rules"][1]["receipts"] == ["b"] and st["corrections"][1]["state"] == "ruled"
+    assert "Failed rules" not in learn.pending(st)
 
 
 if __name__ == "__main__":

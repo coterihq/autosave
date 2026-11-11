@@ -48,10 +48,20 @@ def export(state):
     os.replace(tmp, f)
 
 
+def _private_dir(d):
+    d.mkdir(parents=True, exist_ok=True)
+    os.chmod(d, 0o700)
+
+
+def quarantine_count():
+    """Damaged state files set aside so far; the files themselves are the record, so a read cannot lose it."""
+    return len(list(paths()[0].parent.glob("learn.json.corrupt-*")))
+
+
 def mutate(fn):
     """Under an exclusive lock: load, run fn(state) -> (changed, result); save atomically if changed."""
     f, lock, _ = paths()
-    f.parent.mkdir(parents=True, exist_ok=True)
+    _private_dir(f.parent)
     with open(lock, "a") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
         st = load()
@@ -139,13 +149,14 @@ def record(state, session_id, project_path, turns, consumed, today):
 
 LIVE = ("trial", "held")
 CAP = 15
-BAD_TEXT = "rule text must be one line, max 200 characters, not starting with # and with no @path"
+BAD_TEXT = "rule text must be one line, max 200 characters, not starting with # and with no @path and no credentials"
 
 
 def clean_rule(text):
-    """Single-line rule text, or None if empty, over 200 chars, starting with #, or holding an @path (@ at start or after a space)."""
+    """Single-line rule text, or None if empty, over 200 chars, starting with #, holding an @path (@ at start or after a space) or a credential shape."""
     t = " ".join(str(text).split())
-    return t if t and len(t) <= 200 and t[0] != "#" and not re.search(r"(^|\s)@", t) else None
+    return t if t and len(t) <= 200 and t[0] != "#" and not re.search(r"(^|\s)@", t) \
+        and not SECRET_RE.search(t) else None
 
 
 def _live(state):
@@ -160,9 +171,16 @@ def _corr(state, key):
     return next((c for c in state["corrections"] if c["key"] == key), None)
 
 
+NOT_YET = ("no correction with that key is recorded yet; it is recorded when the reply to it finishes. "
+           "Ask the user to answer again after your next reply.")
+
+
 def approve(state, key, text, today):
     c = _corr(state, key)
-    if c is None or c["state"] != "pending":
+    if c is None:
+        return False, NOT_YET
+    old = _rule(state, c["rule_id"]) if c["state"] == "repeat" else None  # a failed rule's last repeat may seed its rewrite
+    if c["state"] != "pending" and not (old and old["state"] == "failed"):
         return False, "no pending correction with key %s" % key
     t = clean_rule(text)
     if t is None:
@@ -181,7 +199,9 @@ def approve(state, key, text, today):
 
 def dismiss(state, key):
     c = _corr(state, key)
-    if c is None or c["state"] != "pending":
+    if c is None:
+        return False, NOT_YET
+    if c["state"] != "pending":
         return False, "no pending correction with key %s" % key
     c["state"] = "dismissed"
     return True, "dismissed %s" % key
@@ -189,7 +209,9 @@ def dismiss(state, key):
 
 def repeat(state, key, rule_id):
     c, r = _corr(state, key), _rule(state, rule_id)
-    if c is None or r is None or r["state"] not in LIVE or c["state"] != "pending" or key in r["receipts"]:
+    if c is None:
+        return False, NOT_YET
+    if r is None or r["state"] not in LIVE or c["state"] != "pending" or key in r["receipts"]:
         return False, "need a pending correction key (not one of the rule's own receipts) and a live rule id"
     c["state"], c["rule_id"] = "repeat", rule_id
     if key not in r["repeats"]:
@@ -249,7 +271,7 @@ def _live_lines(state):
 
 def pending(state):
     out = []
-    if state.get("quarantined"):
+    if quarantine_count() > 0:
         out.append("A damaged state file was set aside and a new one started.")
     todo = [c for c in state["corrections"] if c["state"] == "pending"]
     out.append("Pending corrections: %d" % len(todo))
@@ -257,7 +279,13 @@ def pending(state):
     for i, c in enumerate(todo, 1):
         out.append("%d. key=%s date=%s\n   user: %s\n   reply before: %s" % (i, c["key"], c["ts"][:10], c["text"], c["prev_reply"]))
     out.append("Live rules:")
-    return "\n".join(out + _live_lines(state))
+    out += _live_lines(state)
+    failed = [(r, _corr(state, r["repeats"][-1])) for r in state["rules"] if r["state"] == "failed" and r["repeats"]]
+    failed = [(r, c) for r, c in failed if c and c["state"] == "repeat"]
+    if failed:
+        out.append("Failed rules (offer one rewrite each):")
+        out += ["  rule %d: %s (latest repeat key=%s)" % (r["id"], r["text"], c["key"]) for r, c in failed]
+    return "\n".join(out)
 
 
 def status(state, today, kill=False):
@@ -277,16 +305,21 @@ def status(state, today, kill=False):
                 lk(acc >= 0.30, "acceptance %.2f (need 0.30)" % acc),
                 lk(any(c["state"] == "repeat" for c in state["corrections"]), "corrections marked repeat: %d (need 1)" %
                    sum(c["state"] == "repeat" for c in state["corrections"])),
-                lk(not state["quarantined"] and len(keys) == len(set(keys)), "state intact: quarantined %d, duplicate keys %d" %
-                   (state["quarantined"], len(keys) - len(set(keys))))]
+                lk(not quarantine_count() and len(keys) == len(set(keys)), "state intact: quarantined %d, duplicate keys %d" %
+                   (quarantine_count(), len(keys) - len(set(keys))))]
     return "\n".join(out)
 
 
-OFFER_LINE = ("Autosave Learn: the user's message may be a correction. Fix the issue first. Then, only if it corrected your own work: "
-              "run `python3 {py} pending`; if it breaks a listed rule ask exactly \"Count as a repeat of rule N?\", otherwise ask exactly "
-              "\"Save this as a rule?\" and quote one proposed rule (one line, max 200 characters). On yes run "
-              "`python3 {py} repeat --key K --rule N` or `python3 {py} approve --key K --text \"...\"`; on no run "
-              "`python3 {py} dismiss --key K`. Type the path unquoted. If it was not a correction of your work, do not mention rules.")
+OFFER_LINE = ("Autosave Learn: the user's message may be a correction (key {key}). Fix the issue first. Then, only if it corrected your "
+              "own work: run `python3 ~/.claude/hooks/learn.py pending` to see the live rules; if the message breaks a listed rule ask "
+              "exactly \"Count as a repeat of rule N?\", otherwise ask exactly \"Save this as a rule?\" and quote one proposed rule "
+              "(one line, max 200 characters). Do not run approve, repeat or dismiss in this reply: wait for the user's answer. "
+              "If it was not a correction of your work, do not mention rules.")
+ANSWER_LINE = ("Autosave Learn: the user is answering your rule question. If your question was about their previous message, its "
+               "correction key is {key}. On yes run `python3 ~/.claude/hooks/learn.py approve --key {key} --text 'RULE'` or "
+               "`python3 ~/.claude/hooks/learn.py repeat --key {key} --rule N`; on no run "
+               "`python3 ~/.claude/hooks/learn.py dismiss --key {key}`. If the question came from /learn, use the key shown in the "
+               "pending list instead. Put the rule text in single quotes; write a single quote inside it as '\\''. Type the path unquoted.")
 NUDGE_AT = 3
 
 
@@ -303,7 +336,7 @@ def _read_offer(f):
 
 
 def _write_offer(f, o):
-    f.parent.mkdir(parents=True, exist_ok=True)
+    _private_dir(f.parent)
     f.write_text(json.dumps(o))  # ponytail: plain write; one session runs its hooks one at a time
 
 
@@ -339,15 +372,16 @@ def hook(payload, today):
             return ""
         f = _offer_file(sid); o = _read_offer(f)
         if o["open"]:
+            key = o["open"]
             o["consumed"].append(pid); o["open"] = None
             _write_offer(f, o)
-            return ""
+            return ANSWER_LINE.format(key=key)
         if batch:
             return ""
         if is_correction(payload.get("prompt", "")):
             o["asked_pending"] = pid  # an unfinished earlier turn (never reached Stop) is simply replaced
             _write_offer(f, o)
-            return OFFER_LINE.format(py=Path(__file__).resolve())
+            return OFFER_LINE.format(key=pid)
         return ""
     if ev == "Stop":
         f = _offer_file(sid); o = _read_offer(f)

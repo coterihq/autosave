@@ -87,7 +87,7 @@ Learn keeps your corrections. When a message of yours opens with a correction ph
 Learn is OFF by default. Three switches in `kit.conf`:
 
 - `LEARN="on"` turns it on (`CLAUDE_LEARN` in `settings.json`).
-- `LEARN_MODE` is `moment` (the default) or `batch` (`CLAUDE_LEARN_MODE`). In moment mode Claude fixes the issue and then asks `Save this as a rule?`, or `Count as a repeat of rule N?` if the correction breaks a listed rule. In batch mode nothing is asked mid-session; corrections pile up and you review them with `/learn`. Batch mode shows a one-line reminder at session start once 3 or more are waiting, at most once a day. That reminder is best effort: another tool's startup message can displace it. `/learn` always lists everything pending.
+- `LEARN_MODE` is `moment` (the default) or `batch` (`CLAUDE_LEARN_MODE`). In moment mode Claude fixes the issue and then asks `Save this as a rule?`, or `Count as a repeat of rule N?` if the correction breaks a listed rule. The rule is saved on your answer, one turn after the correction, not in the same reply. In batch mode nothing is asked mid-session; corrections pile up and you review them with `/learn`. Batch mode shows a one-line reminder at session start once 3 or more are waiting, at most once a day. That reminder is best effort: another tool's startup message can displace it. `/learn` always lists everything pending.
 - `LEARN_TRIAL_DAYS` (default 14) is how many active days a new rule stays on trial before it is labelled held (`CLAUDE_LEARN_TRIAL_DAYS`).
 
 `kit.conf` is read when you run `install.sh`, and the installer only adds missing keys to an existing `~/.claude/settings.json`. If you installed before and later set `LEARN="on"` in `kit.conf`, rerunning the installer will not change the value already in `settings.json`. Set `"CLAUDE_LEARN": "on"` in the `env` block of `~/.claude/settings.json` yourself, then restart Claude Code. The same goes for the other two switches.
@@ -104,11 +104,13 @@ Limits:
 - Rules load at session start. Other sessions that are already open pick up a rule change after they restart or compact.
 - The model that made the mistake also suggests whether it was one and whether a repeat matches. Check what it proposes before you say yes.
 
-Each approval runs `python3 ~/.claude/hooks/learn.py`, which shows a permission prompt unless you allow it. To skip the prompt, add this to the `permissions.allow` list in `~/.claude/settings.json`, with your own home directory:
+Each approval runs `python3 ~/.claude/hooks/learn.py`, which shows a permission prompt unless you allow it. To skip the prompt, add this to the `permissions.allow` list in `~/.claude/settings.json`:
 
 ```
-Bash(python3 /Users/you/.claude/hooks/learn.py:*)
+Bash(python3 ~/.claude/hooks/learn.py:*)
 ```
+
+An allow rule must match the command exactly as typed, which is why Learn always types that form.
 
 Privacy: for each correction Learn stores the first 200 characters of your message and of Claude's reply before it. Text that looks like a credential (common key, token and password shapes) is replaced by `[redacted]`; this is a pattern list, not a guarantee. Everything stays on your machine in `~/.claude/learn/learn.json` (mode 600), with a copy in `learn.json.bak`.
 
