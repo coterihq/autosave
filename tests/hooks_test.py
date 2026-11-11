@@ -345,6 +345,7 @@ def test_learn_kill_report():
     assert len(lines) == 4 and all(l.startswith("FAIL") for l in lines), lines
 
 
+# The ban covers strings Learn authors; user-typed text is quoted verbatim as a receipt.
 def test_learn_output_never_says_proven_or_works():
     import re
     st = _st({"state": "held", "receipts": ["k"]}, {"state": "failed", "repeats": ["a", "b"]},
@@ -353,6 +354,148 @@ def test_learn_output_never_says_proven_or_works():
     out = "\n".join([learn.render_rules(st), learn.status(st, "2026-11-10", kill=True), learn.pending(st),
                      learn.approve(st, "k", "x" * 201, "2026-11-10")[1], learn.retire(st, 99)[1]])
     assert not re.search(r"\b(proven|works)\b", out, re.I), out
+
+
+# --- Learn: hook mode ---
+LON = {"CLAUDE_LEARN": "on"}
+
+
+def _ups(pid, prompt, sid="s1", **kw):
+    return dict({"hook_event_name": "UserPromptSubmit", "session_id": sid, "prompt_id": pid, "prompt": prompt, "cwd": "/p",
+                 "transcript_path": "/none"}, **kw)
+
+
+def _stop(pid, last, tp="/none", sid="s1"):
+    return {"hook_event_name": "Stop", "session_id": sid, "prompt_id": pid, "last_assistant_message": last,
+            "cwd": "/p", "transcript_path": str(tp), "stop_hook_active": False}
+
+
+def _transcript(home, name, prompts):
+    f = Path(home) / name
+    rows = [{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "done"}]}}]
+    for pid, text in prompts:
+        rows.append({"type": "user", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": False,
+                     "origin": {"kind": "human"}, "message": {"role": "user", "content": text}, "promptId": pid})
+    f.write_text("\n".join(json.dumps(r) for r in rows))
+    return f
+
+
+def _state(home):
+    with _home(home):
+        return learn.load()
+
+
+def test_learn_off_by_default_is_silent():
+    home = tmp_home()
+    r = run_hook("learn.py", _ups("p1", "no, wrong"), home)
+    assert r.returncode == 0 and r.stdout == "" and not (home / ".claude" / "learn").exists()
+
+
+def test_learn_offer_then_no_is_consumed():
+    home = tmp_home()
+    tp = _transcript(home, "t.jsonl", [("p1", "no, wrong")])
+    r = run_hook("learn.py", _ups("p1", "no, wrong"), home, LON)
+    assert "Save this as a rule?" in r.stdout and str(HOOKS / "learn.py") in r.stdout
+    run_hook("learn.py", _stop("p1", "Save this as a rule? Proposed: use tabs", tp), home, LON)
+    assert run_hook("learn.py", _ups("p2", "no"), home, LON).stdout == ""
+    _transcript(home, "t.jsonl", [("p1", "no, wrong"), ("p2", "no")])
+    run_hook("learn.py", _stop("p2", "ok", tp), home, LON)
+    assert [c["key"] for c in _state(home)["corrections"]] == ["p1"]
+
+
+def test_learn_offer_not_asked_closes():
+    home = tmp_home()
+    assert "Save this as a rule?" in run_hook("learn.py", _ups("p1", "no, wrong"), home, LON).stdout
+    run_hook("learn.py", _stop("p1", "Fixed."), home, LON)
+    assert "Save this as a rule?" in run_hook("learn.py", _ups("p2", "no, still wrong"), home, LON).stdout
+
+
+def test_learn_batch_mode_no_injection():
+    r = run_hook("learn.py", _ups("p1", "no, wrong"), tmp_home(), dict(LON, CLAUDE_LEARN_MODE="batch"))
+    assert r.returncode == 0 and r.stdout == ""
+
+
+def test_learn_subagent_prompt_ignored():
+    r = run_hook("learn.py", _ups("p1", "no, wrong", agent_id="a1"), tmp_home(), LON)
+    assert r.returncode == 0 and r.stdout == ""
+
+
+def test_learn_nudge_at_three_once_a_day():
+    home = tmp_home(); env = dict(LON, CLAUDE_LEARN_MODE="batch")
+    ss = {"hook_event_name": "SessionStart", "session_id": "s9", "source": "startup", "cwd": "/p", "transcript_path": "/none"}
+    def seed(n):
+        with _home(home):
+            learn.mutate(lambda s: (True, s["corrections"].extend(_st(corrections=_pend(*["k%d" % i for i in range(n)]))["corrections"])))
+    seed(2)
+    assert run_hook("learn.py", ss, home, env).stdout == ""
+    with _home(home):
+        learn.mutate(lambda s: (True, s["corrections"].extend(_st(corrections=_pend("k9"))["corrections"])))
+    out = json.loads(run_hook("learn.py", ss, home, env).stdout)
+    assert "3 corrections" in out["systemMessage"] and "/learn" in out["systemMessage"]
+    assert run_hook("learn.py", ss, home, env).stdout == ""
+
+
+def test_learn_hook_garbage_stdin_fails_open():
+    r = run_hook("learn.py", "{{{", tmp_home(), LON)
+    assert r.returncode == 0 and r.stdout == ""
+
+
+def test_learn_two_sessions_record_concurrently():
+    home = tmp_home()
+    t1 = _transcript(home, "a.jsonl", [("a1", "no, wrong")]); t2 = _transcript(home, "b.jsonl", [("b1", "undo that")])
+    e = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_")}
+    e.update(HOME=str(home), CLAUDE_LEARN="on")
+    ps = [subprocess.Popen([sys.executable, str(HOOKS / "learn.py")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=e)
+          for _ in range(2)]
+    for p, (sid, pid, tp) in zip(ps, [("sa", "a1", t1), ("sb", "b1", t2)]):
+        p.stdin.write(json.dumps(_stop(pid, "ok", tp, sid))); p.stdin.close()
+    assert [p.wait() for p in ps] == [0, 0]
+    assert sorted(c["key"] for c in _state(home)["corrections"]) == ["a1", "b1"]
+
+
+# --- Learn: carried fixes from Task 3 review ---
+def test_learn_approve_twice_creates_one_rule():
+    st = _st(corrections=_pend("k1"))
+    assert learn.approve(st, "k1", "one", "2026-11-10")[0]
+    ok, msg = learn.approve(st, "k1", "two", "2026-11-10")
+    assert not ok and msg and len(st["rules"]) == 1
+
+
+def test_learn_repeat_of_own_receipt_refused():
+    st = _st(corrections=_pend("k1"))
+    learn.approve(st, "k1", "one", "2026-11-10")
+    st["corrections"][0]["state"] = "pending"  # even if state were reset, the receipt key cannot count as a repeat
+    ok, _ = learn.repeat(st, "k1", 1)
+    assert not ok and st["rules"][0]["repeats"] == []
+
+
+def test_learn_dismiss_ruled_key_refused():
+    st = _st(corrections=_pend("k1"))
+    learn.approve(st, "k1", "one", "2026-11-10")
+    ok, _ = learn.dismiss(st, "k1")
+    assert not ok and st["corrections"][0]["state"] == "ruled"
+
+
+def test_learn_rule_text_rejects_at_path_anywhere():
+    st = _st(corrections=_pend("k1"))
+    ok, msg = learn.approve(st, "k1", "always read @~/notes.md first", "2026-11-10")
+    assert not ok and msg == "rule text must be one line, max 200 characters, not starting with # and with no @path"
+    assert learn.clean_rule("mail a@b.com") == "mail a@b.com" and learn.clean_rule("@x") is None
+
+
+def test_learn_export_leaves_no_temp_file():
+    home = tmp_home()
+    with _home(home):
+        learn.export(learn._fresh())
+        names = [p.name for p in learn.paths()[2].parent.iterdir()]
+    assert names == ["learned-rules.md"], names
+
+
+def test_learn_cli_argument_error_exits_zero():
+    r = subprocess.run(
+        [sys.executable, str(HOOKS / "learn.py"), "retire", "--rule", "notanumber"], capture_output=True, text=True,
+        env=dict(os.environ, HOME=str(tmp_home())))
+    assert r.returncode == 0 and "usage" in r.stdout.lower(), (r.returncode, r.stdout, r.stderr)
 
 
 if __name__ == "__main__":

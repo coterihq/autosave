@@ -43,7 +43,9 @@ def export(state):
     """Write the generated rules file, creating ~/.claude/rules/ if needed."""
     f = paths()[2]
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(render_rules(state))
+    tmp = f.with_name(f.name + ".tmp")
+    tmp.write_text(render_rules(state))
+    os.replace(tmp, f)
 
 
 def mutate(fn):
@@ -137,13 +139,13 @@ def record(state, session_id, project_path, turns, consumed, today):
 
 LIVE = ("trial", "held")
 CAP = 15
-BAD_TEXT = "rule text must be one line, max 200 characters, not starting with @ or #"
+BAD_TEXT = "rule text must be one line, max 200 characters, not starting with # and with no @path"
 
 
 def clean_rule(text):
-    """Single-line rule text, or None if empty, over 200 chars, or starting with @ or #."""
+    """Single-line rule text, or None if empty, over 200 chars, starting with #, or holding an @path (@ at start or after a space)."""
     t = " ".join(str(text).split())
-    return t if t and len(t) <= 200 and t[0] not in "@#" else None
+    return t if t and len(t) <= 200 and t[0] != "#" and not re.search(r"(^|\s)@", t) else None
 
 
 def _live(state):
@@ -160,8 +162,8 @@ def _corr(state, key):
 
 def approve(state, key, text, today):
     c = _corr(state, key)
-    if c is None:
-        return False, "no correction with key %s" % key
+    if c is None or c["state"] != "pending":
+        return False, "no pending correction with key %s" % key
     t = clean_rule(text)
     if t is None:
         return False, BAD_TEXT
@@ -179,16 +181,16 @@ def approve(state, key, text, today):
 
 def dismiss(state, key):
     c = _corr(state, key)
-    if c is None:
-        return False, "no correction with key %s" % key
+    if c is None or c["state"] != "pending":
+        return False, "no pending correction with key %s" % key
     c["state"] = "dismissed"
     return True, "dismissed %s" % key
 
 
 def repeat(state, key, rule_id):
     c, r = _corr(state, key), _rule(state, rule_id)
-    if c is None or r is None or r["state"] not in LIVE:
-        return False, "need a known correction key and a live rule id"
+    if c is None or r is None or r["state"] not in LIVE or c["state"] != "pending" or key in r["receipts"]:
+        return False, "need a pending correction key (not one of the rule's own receipts) and a live rule id"
     c["state"], c["rule_id"] = "repeat", rule_id
     if key not in r["repeats"]:
         r["repeats"].append(key)
@@ -280,8 +282,100 @@ def status(state, today, kill=False):
     return "\n".join(out)
 
 
+OFFER_LINE = ("Autosave Learn: the user's message may be a correction. Fix the issue first. Then, only if it corrected your own work: "
+              "run `python3 {py} pending`; if it breaks a listed rule ask exactly \"Count as a repeat of rule N?\", otherwise ask exactly "
+              "\"Save this as a rule?\" and quote one proposed rule (one line, max 200 characters). On yes run "
+              "`python3 {py} repeat --key K --rule N` or `python3 {py} approve --key K --text \"...\"`; on no run "
+              "`python3 {py} dismiss --key K`. Type the path unquoted. If it was not a correction of your work, do not mention rules.")
+NUDGE_AT = 3
+
+
+def _offer_file(sid):
+    return Path.home() / ".claude/learn" / ("offer-%s.json" % re.sub(r"[^\w.-]", "_", str(sid)))
+
+
+def _read_offer(f):
+    try:
+        o = json.loads(f.read_text())
+        return {"open": o.get("open"), "consumed": list(o.get("consumed", []))}
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {"open": None, "consumed": []}
+
+
+def _write_offer(f, o):
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(o))  # ponytail: plain write; one session runs its hooks one at a time
+
+
+def _trial_days():
+    try:
+        return int(os.environ.get("CLAUDE_LEARN_TRIAL_DAYS", "14"))
+    except ValueError:
+        return 14
+
+
+def _nudge(today):
+    def fn(st):
+        n = sum(c["state"] == "pending" for c in st["corrections"])
+        if n < NUDGE_AT or st["last_nudge"] == today:
+            return False, ""
+        st["last_nudge"] = today
+        return True, json.dumps({"systemMessage": "Autosave Learn: %d corrections to review, run /learn" % n})
+    return mutate(fn)
+
+
+def hook(payload, today):
+    """Text to print for one hook event; "" for nothing."""
+    if os.environ.get("CLAUDE_LEARN") != "on":
+        return ""
+    ev, sid = payload.get("hook_event_name"), payload.get("session_id")
+    batch = os.environ.get("CLAUDE_LEARN_MODE") == "batch"
+    if ev == "SessionStart":
+        return _nudge(today) if batch else ""
+    if ev == "UserPromptSubmit":
+        if batch or "agent_id" in payload:
+            return ""
+        f = _offer_file(sid); o = _read_offer(f)
+        if o["open"]:
+            o["consumed"].append(payload.get("prompt_id")); o["open"] = None
+            _write_offer(f, o)
+            return ""
+        if is_correction(payload.get("prompt", "")):
+            o["open"] = payload.get("prompt_id")
+            _write_offer(f, o)
+            return OFFER_LINE.format(py=Path(__file__).resolve())
+        return ""
+    if ev == "Stop":
+        f = _offer_file(sid); o = _read_offer(f)
+        last = payload.get("last_assistant_message") or ""
+        if o["open"] and o["open"] == payload.get("prompt_id") and "Save this as a rule?" not in last \
+                and "Count as a repeat of rule" not in last:
+            o["open"] = None
+            _write_offer(f, o)
+        turns = user_turns(payload.get("transcript_path"))
+        mutate(lambda st: (record(st, sid, payload.get("cwd", ""), turns, set(o["consumed"]), today)
+                           | promote(st, today, _trial_days()), ""))
+    return ""
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):  # usage errors go to stdout with exit 0, like every other path here
+        print(self.format_usage() + message)
+        sys.exit(0)
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="learn.py")
+    argv = sys.argv[1:] if argv is None else argv
+    today = dt.date.today().isoformat()
+    if not argv:
+        try:
+            out = hook(json.load(sys.stdin), today)
+            if out:
+                print(out)
+        except Exception:
+            pass
+        return
+    ap = _Parser(prog="learn.py")
     sub = ap.add_subparsers(dest="cmd")
     for name, args in {"pending": [], "approve": ["key", "text"], "dismiss": ["key"], "repeat": ["key", "rule"],
                        "edit": ["rule", "text"], "retire": ["rule"], "export": [], "status": []}.items():
@@ -291,8 +385,7 @@ def main(argv=None):
     sub.choices["status"].add_argument("--kill", action="store_true")
     a = ap.parse_args(argv)
     if not a.cmd:
-        return  # ponytail: Task 4 turns no-argument mode into hook mode.
-    today = dt.date.today().isoformat()
+        ap.error("a command is required")
     ops = {"pending": lambda s: (False, pending(s)),
            "status": lambda s: (False, status(s, today, a.kill)),
            "export": lambda s: (True, "rules file written"),
