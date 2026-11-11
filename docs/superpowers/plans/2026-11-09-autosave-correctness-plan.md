@@ -77,7 +77,7 @@ def test_output_cap_garbage_stdin_fails_open():
 
 ### Task 2: A4 standing-rules wording (A2/A3 dropped at 3b)
 
-3b found PreCompact stdout *does* reach the compaction summarizer (docs: "your stdout becomes instructions for the compaction summary"), so `precompact_dump.py`, `session_inject.py` and README L38 stay as they are (Phil, 2026-11-09).
+3b found PreCompact stdout *does* reach the compaction summarizer (docs: "your stdout becomes instructions for the compaction summary"), so `precompact_dump.py`, `session_inject.py` and README L38 stay as they are (the maintainer, 2026-11-09).
 
 **Files:**
 - Modify: `rules/standing-rules.md:19-20` — "(hooks/usage_guard.py warns you.)" replaces "(Enforced by hooks/usage_guard.py.)"
