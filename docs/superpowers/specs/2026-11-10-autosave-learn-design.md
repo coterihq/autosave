@@ -116,6 +116,8 @@ Rev 2.1 corrections, found when reading the code for the plan:
 - The Stop handler closes an open offer when Claude's reply did not contain
   the exact question, so a false detection cannot swallow the next real
   correction.
+- Rule text is refused when it contains an `@path` anywhere, not only at the start, because memory files treat it as an import.
+- The offer is two-phase: `asked_pending` becomes `open` only after Stop sees the exact question, so an interrupted turn cannot swallow the next correction.
 
 ## Data (`learn.json`)
 

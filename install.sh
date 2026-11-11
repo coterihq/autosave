@@ -40,7 +40,8 @@ from pathlib import Path
 kit = Path(os.environ["KIT_DIR"]); dest = Path(os.environ["CLAUDE_DIR"])
 dry = os.environ["DRY_RUN"] == "1"; backup = Path(os.environ["BACKUP_DIR"])
 KEYS = ["USER_NAME", "APPROVER", "PROJECTS_DIR", "EVALS_DIR", "OUTPUT_DIR", "MONTHLY_BUDGET_USD",
-        "CYCLE", "CYCLE_START_DAY", "CONTEXT_WARN_TOKENS", "FOOTER_MARKER", "FOOTER_DISABLE", "INVARIANTS"]
+        "CYCLE", "CYCLE_START_DAY", "CONTEXT_WARN_TOKENS", "FOOTER_MARKER", "FOOTER_DISABLE", "INVARIANTS",
+        "LEARN", "LEARN_MODE", "LEARN_TRIAL_DAYS"]
 vals = {k: os.environ.get(k, "") for k in KEYS}
 home = str(Path.home())
 for k in ("PROJECTS_DIR", "EVALS_DIR", "OUTPUT_DIR"):  # show paths as ~/... in prose

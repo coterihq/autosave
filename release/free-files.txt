@@ -5,9 +5,11 @@ LICENSE
 QUICKSTART.md
 README.md
 THIRD-PARTY-NOTICES.md
+commands/bad.md
 commands/claude-audit.md
 commands/dormant.md
 commands/handoff.md
+commands/learn.md
 commands/make-chart.md
 commands/make-deck.md
 commands/make-diagram.md

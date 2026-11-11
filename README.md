@@ -39,6 +39,7 @@ Requirements: Claude Code, Python 3.9+, bash. Tested on macOS (zsh). Linux shoul
 | `session_inject.py` | SessionStart (compact, resume) | Re-injects `docs/ai/state/session-critical.md` (project) or `~/.claude/state/session-critical.md`, with a staleness warning past 24h. | Compaction silently drops objectives; this puts them back mechanically. |
 | `footer_check.py` | Stop | When enabled (off by default; `FOOTER_DISABLE=0` turns it on). When on, substantive replies (>1200 chars) must include a "Tooling rec:" line; it nudges once and never loops. Each nudge costs one extra turn. | Surfaces the commands/skills you already own instead of letting them rot. |
 | `usage_guard.py` | Stop | Estimates spend from local transcripts into `~/.claude/usage/ledger.json`, computes pace vs budget, warns at 0.8x, recommends dropping a model tier at 1.0x, and above 150k context writes one deterministic handoff to `~/.claude/handoffs/`. | Keeps you inside plan limits and turns long sessions into clean restarts. |
+| `learn.py` | UserPromptSubmit, Stop, SessionStart (startup) | Off by default. Records messages that open with a correction phrase, offers to save one as a rule, and writes approved rules to `~/.claude/rules/learned-rules.md`. See the Learn section. | Keeps your corrections from being lost between sessions. |
 | `usage_statusline.py` | statusLine | `model · pace · $spent/$budget · ctx` | Live pace without asking. |
 | `usage_digest.py` | cron (optional) | Weekly markdown digest: spend, pace, spend by tier, top 3 sessions. `--notes` also posts to Apple Notes on macOS. | Feeds `/claude-audit`. |
 | `check_rule_sync.py` | manual / cron / installer | Compares `rules/standing-rules.md` with the generated block in `CLAUDE.md`; on drift writes `RULE_SYNC_DRIFT.md`; `--fix` regenerates the block. Prints a short sha256 you can pin elsewhere. | One source of truth for rules across surfaces. |
@@ -74,8 +75,44 @@ do, the installer appends just the standing-rules marker block.
 | `/postmortem` | Turns an incident into a regression eval via the `incident-to-eval` skill. |
 | `/claude-audit` | Weekly: attribute usage, review hook hits, make exactly one targeted change, measure before/after. |
 | `/dormant` | Factual table of projects under your projects dir with last-touched dates. |
+| `/learn` | Lists captured corrections, proposes up to 3 rules, and saves, counts or dismisses each one only on your answer. `/learn status` shows every rule with its receipts. Needs Learn switched on. |
+| `/bad` | Marks the previous reply as wrong, fixes it, and asks `Save this as a rule?`. |
 | `/make-chart`, `/make-doc`, `/make-deck`, `/make-diagram`, `/make-sheet` | Router commands: restate the deliverable, pick the right skill or format, ask at most 3 questions, verify by looking, save to your output dir. They mention optional skills (Anthropic document skills, Artifacts, dataviz); remove routes you don't have. |
 | `/make-image` | Picks a route for an image: a local or connected image model, a designed layout, or hand-written SVG (always available); never generates charts of real data. |
+
+## Learn (off by default)
+
+Learn keeps your corrections. When a message of yours opens with a correction phrase ("no", "wrong", "undo", "revert", "not that"), Learn records it with the reply it answered. You decide whether it becomes a rule. Approved rules go into `~/.claude/rules/learned-rules.md`, which Claude Code loads at session start. Every rule keeps the corrections it came from as receipts.
+
+Learn is OFF by default. Three switches in `kit.conf`:
+
+- `LEARN="on"` turns it on (`CLAUDE_LEARN` in `settings.json`).
+- `LEARN_MODE` is `moment` (the default) or `batch` (`CLAUDE_LEARN_MODE`). In moment mode Claude fixes the issue and then asks `Save this as a rule?`, or `Count as a repeat of rule N?` if the correction breaks a listed rule. In batch mode nothing is asked mid-session; corrections pile up and you review them with `/learn`. Batch mode shows a one-line reminder at session start once 3 or more are waiting, at most once a day. That reminder is best effort: another tool's startup message can displace it. `/learn` always lists everything pending.
+- `LEARN_TRIAL_DAYS` (default 14) is how many active days a new rule stays on trial before it is labelled held (`CLAUDE_LEARN_TRIAL_DAYS`).
+
+`kit.conf` is read when you run `install.sh`, and the installer only adds missing keys to an existing `~/.claude/settings.json`. If you installed before and later set `LEARN="on"` in `kit.conf`, rerunning the installer will not change the value already in `settings.json`. Set `"CLAUDE_LEARN": "on"` in the `env` block of `~/.claude/settings.json` yourself, then restart Claude Code. The same goes for the other two switches.
+
+Commands: `/learn` reviews pending corrections and proposes at most 3 rules, each quoting its corrections. `/learn status` lists every rule with its state, days in that state, repeats and receipts. `/bad` marks the previous reply as wrong, has Claude fix it, and asks `Save this as a rule?`. Your yes or no is the only grade.
+
+A rule is one line of at most 200 characters, cannot start with `#`, and cannot contain an `@path` (Claude Code would read it as a file import). There is a cap of 15 live rules. A rule that you confirm as repeated twice is marked failed and removed from the rules file. A rule with fewer than two repeats after the trial days is labelled "no repeat seen since <date>". That label is all Learn claims: it does not say the rule helped.
+
+Limits:
+
+- If you rarely correct Claude, nearly every rule will end as "no repeat seen", because there are too few events for a repeat to show. For you Learn is a ledger of corrections with receipts.
+- Detection looks only at how a message opens, in English. Corrections phrased differently are not seen, and some messages that open with "no" are not corrections.
+- Claude Code's built-in memory may save the same correction on its own, so a rule can overlap with it.
+- Rules load at session start. Other sessions that are already open pick up a rule change after they restart or compact.
+- The model that made the mistake also suggests whether it was one and whether a repeat matches. Check what it proposes before you say yes.
+
+Each approval runs `python3 ~/.claude/hooks/learn.py`, which shows a permission prompt unless you allow it. To skip the prompt, add this to the `permissions.allow` list in `~/.claude/settings.json`, with your own home directory:
+
+```
+Bash(python3 /Users/you/.claude/hooks/learn.py:*)
+```
+
+Privacy: for each correction Learn stores the first 200 characters of your message and of Claude's reply before it. Text that looks like a credential (common key, token and password shapes) is replaced by `[redacted]`; this is a pattern list, not a guarantee. Everything stays on your machine in `~/.claude/learn/learn.json` (mode 600), with a copy in `learn.json.bak`.
+
+To remove Learn by hand: delete the three `learn.py` entries from `UserPromptSubmit`, `Stop` and `SessionStart` in `~/.claude/settings.json`, delete `~/.claude/rules/learned-rules.md` and the `~/.claude/learn/` folder, and optionally remove the `CLAUDE_LEARN*` keys from the `env` block. Setting `CLAUDE_LEARN` to anything but `on` also stops all recording and offers.
 
 ## Skills (`skills/`)
 
@@ -121,6 +158,7 @@ their "Not for" lines; those are pointers, not dependencies.
 
 `~/.claude/handoffs/` (handoffs), `~/.claude/state/` (session-critical fallback,
 compaction breadcrumb, audit log), `~/.claude/usage/` (ledger, digests),
+`~/.claude/learn/` and `~/.claude/rules/learned-rules.md` (only when Learn is on),
 `~/.claude/RULE_SYNC_DRIFT.md` (only on drift), `~/.claude/backups/autosave-*`
 (installer backups).
 
@@ -131,6 +169,8 @@ compaction breadcrumb, audit log), `~/.claude/usage/` (ledger, digests),
    the kit's hook entries from `~/.claude/settings.json` by hand.
 2. Delete the files listed in `~/.claude/.autosave-manifest.json`, then the
    manifest itself. Skills and commands keep loading until you do.
+3. If you used Learn, also delete `~/.claude/rules/learned-rules.md` and `~/.claude/learn/`
+   (the manifest does not list them).
 
 Either order is safe: a hook whose file is gone exits 0 and lets the call through.
 

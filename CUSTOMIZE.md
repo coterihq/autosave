@@ -78,6 +78,7 @@ the rule in `standing-rules.md` so Claude knows why it is blocked.
 | Budget, weekly cycle, context threshold | `CLAUDE_MONTHLY_BUDGET_USD`, `CLAUDE_CYCLE`, `CLAUDE_CONTEXT_WARN_TOKENS` |
 | Prices for the spend estimate | `PRICES` table at the top of `hooks/usage_guard.py` |
 | Footer line (off by default) | `CLAUDE_FOOTER_DISABLE=0` to turn it on; `CLAUDE_FOOTER_MARKER`, `CLAUDE_FOOTER_MIN_CHARS` |
+| Learn (off by default) | `CLAUDE_LEARN=on`, `CLAUDE_LEARN_MODE` (`moment` or `batch`), `CLAUDE_LEARN_TRIAL_DAYS` in `settings.json` env; see the README Learn section |
 | Extra invariants kept through compaction | `CLAUDE_KIT_INVARIANTS` (one line) |
 | Your own prod-DB wrapper scripts blocked | `CLAUDE_GUARD_DB_WRAPPERS` (regex) |
 | Turn a hook off | remove its entry from `~/.claude/settings.json` (or run `/hooks`) |

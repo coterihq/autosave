@@ -33,3 +33,8 @@ FOOTER_DISABLE="1"
 
 # Optional: one line of invariants the compaction hook must always preserve.
 INVARIANTS=""
+
+# Learn (hooks/learn.py). Off by default. See the README "Learn" section.
+LEARN="off"               # on | off. Set "on" to start capturing corrections.
+LEARN_MODE="moment"       # moment: offer to save a rule right after a correction | batch: review later with /learn
+LEARN_TRIAL_DAYS="14"     # active days a new rule stays on trial before it is labelled held
