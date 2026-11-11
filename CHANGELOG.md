@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-11-11
 
 - Learn (off by default): `hooks/learn.py`, `/learn` and `/bad`. Captures your corrections, offers to save one as a rule (moment mode) or lets you review them later (batch mode), and keeps each rule with its receipts. A rule fails on its second confirmed repeat.
 - Switches: `LEARN`, `LEARN_MODE`, `LEARN_TRIAL_DAYS` in `kit.conf`. See the README "Learn" section.
+- Cross-links in `README.md` and `skills/change-control` now name the paid pack Final Boss (formerly Code Red).
 
 ## 1.2.1 — 2026-11-09
 
