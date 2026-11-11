@@ -18,7 +18,7 @@
 - Scope is fixes A–E only: no new guards, no secret scanning, no plugin packaging, no Linux/Windows work, no Code Red/Quick Save code.
 - Every new shipped file is listed in `release/free-files.txt`.
 - Version `1.2.0`; ZIP filename `autosave.zip` (no version in the name).
-- Gumroad upload stays manual (Phil). No step publishes anything.
+- Gumroad upload stays manual (maintainer). No step publishes anything.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never `git add -A`; stage named paths.
 
 ## Review Focus
@@ -77,7 +77,7 @@ def test_output_cap_garbage_stdin_fails_open():
 
 ### Task 2: A4 standing-rules wording (A2/A3 dropped at 3b)
 
-3b found PreCompact stdout *does* reach the compaction summarizer (docs: "your stdout becomes instructions for the compaction summary"), so `precompact_dump.py`, `session_inject.py` and README L38 stay as they are (Phil, 2026-11-09).
+3b found PreCompact stdout *does* reach the compaction summarizer (docs: "your stdout becomes instructions for the compaction summary"), so `precompact_dump.py`, `session_inject.py` and README L38 stay as they are (the maintainer, 2026-11-09).
 
 **Files:**
 - Modify: `rules/standing-rules.md:19-20` — "(hooks/usage_guard.py warns you.)" replaces "(Enforced by hooks/usage_guard.py.)"
@@ -222,7 +222,7 @@ def test_footer_marked_optional():  # standing-rules.md contains "footer_check.p
   - `standing-rules.md` L13-14: "(Optional: hooks/footer_check.py, off by default.)"
   - QUICKSTART after L35: "`rules/standing-rules.md` and `rules/workflow.md` never auto-update; newer versions land beside yours as `.kit-new`."
   - 4 skills: `migration-auditor` → `/preflight`.
-  - One-line cross-links, store URL `https://coterihq.gumroad.com` (product slugs unknown; Phil can swap in exact links before upload): Code Red in `change-control` L35-36 ("Code Red adds a reviewed parallel-agent coordination workflow") and in README; Quick Save in `evidence-gate` L12 and `outcome-validation` L17 ("Quick Save checks the served SHA for you").
+  - One-line cross-links, store URL `https://coterihq.gumroad.com` (product slugs unknown; the maintainer can swap in exact links before upload): Code Red in `change-control` L35-36 ("Code Red adds a reviewed parallel-agent coordination workflow") and in README; Quick Save in `evidence-gate` L12 and `outcome-validation` L17 ("Quick Save checks the served SHA for you").
   - Add to `release/free-files.txt`, one path per line (no globs; build_free.py rejects them): `tests/hooks_test.py`, `tests/claims_test.py`, `tests/fixtures/transcript_dup.jsonl`, `tests/fixtures/statusline_input.json`, `tests/fixtures/subagents/agent-a.jsonl`, `tests/fixtures/subagents/agent-a.meta.json`.
 - [ ] **Step 4:** `python3 tests/claims_test.py` → `5/5 pass`.
 - [ ] **Step 5:** Commit: `docs: make every README/rules claim true; add claims test`.
@@ -245,5 +245,5 @@ def test_footer_marked_optional():  # standing-rules.md contains "footer_check.p
 ### Task 10: Source mirror, PR
 
 - [ ] **Step 1:** Mirror: `git -C <worktree> diff origin/main...HEAD -- . ':!docs' ':!release' ':!README.md' ':!skills/change-control' ':!tests/claims_test.py' > $SCRATCH/v12.patch`; in `~/PROJECTS/claude-ops-starter-kit`: `git switch -c fix/correctness-v1.2 && git apply $SCRATCH/v12.patch` (plain apply: the repos share no blobs, so --3way buys nothing; all other touched files are byte-identical). Hand-edit source README L3, L35 (46 cases), L40; leave source change-control alone (it ships the paid workflows, no Code Red upsell).. Source README keeps its own skill count (27); run `guard_tests.py`, `hooks_test.py`, `upgrade_test.sh` there (claims_test is free-tree-only by decision Q3a). Commit.
-- [ ] **Step 2: PR.** `git push -u origin fix/correctness-v1.2`; `gh pr create --repo coterihq/autosave` with baseline + spend numbers in the body. Auto-merge: `gh pr merge <n> --auto --squash` only after Phil enables "Allow auto-merge" (currently off); otherwise say so and stop.
+- [ ] **Step 2: PR.** `git push -u origin fix/correctness-v1.2`; `gh pr create --repo coterihq/autosave` with baseline + spend numbers in the body. Auto-merge: `gh pr merge <n> --auto --squash` only after The maintainer enables "Allow auto-merge" (currently off); otherwise say so and stop.
 - [ ] **Rollback:** nothing is published by this plan. Don't upload `autosave.zip`; `gh pr close` or revert the squash commit; `git -C ~/PROJECTS/claude-ops-starter-kit switch main` (fix branch is local only).
