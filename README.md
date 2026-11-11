@@ -178,7 +178,7 @@ Either order is safe: a hook whose file is gone exits 0 and lets the call throug
 
 ## More from Coteri
 
-Code Red ($9) adds plan red-teaming and a reviewed parallel-agent coordination workflow; Quick Save ($5) checks that the served build contains the commit you shipped. Both at https://coterihq.gumroad.com.
+Final Boss ($9) adds plan red-teaming and a reviewed parallel-agent coordination workflow; Quick Save ($5) checks that the served build contains the commit you shipped. Both at https://coterihq.gumroad.com.
 
 ## License
 

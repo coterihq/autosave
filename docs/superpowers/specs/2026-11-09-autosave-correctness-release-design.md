@@ -1,7 +1,7 @@
 # Autosave correctness release — design spec
 
-Date: 2026-11-09 · Status: design approved by Phil (ship-flow stage 1) · Path: architectural
-Target repo: Phil's local Autosave source (the folder that builds `autosave.zip`). Commit this spec on the stage-4 worktree branch at `docs/superpowers/specs/2026-11-09-autosave-correctness-release-design.md`.
+Date: 2026-11-09 · Status: design approved by the maintainer (ship-flow stage 1) · Path: architectural
+Target repo: the maintainer's local Autosave source (the folder that builds `autosave.zip`). Commit this spec on the stage-4 worktree branch at `docs/superpowers/specs/2026-11-09-autosave-correctness-release-design.md`.
 
 ## Goal
 Every claim Autosave makes about itself is true and tested, so the free kit can be the credible front door for Code Red ($9) and Quick Save ($5).
@@ -42,21 +42,21 @@ Every claim Autosave makes about itself is true and tested, so the free kit can 
 ### E. Release
 - Version bump + CHANGELOG entry listing each fix.
 - Rebuild `autosave.zip` (exclude kit.conf, caches).
-- Phil uploads to Gumroad manually (publish = irreversible; not automated).
+- The maintainer uploads to Gumroad manually (publish = irreversible; not automated).
 
-## Grill decisions (stage 2, Phil 2026-11-09)
+## Grill decisions (stage 2, The maintainer 2026-11-09)
 Repo facts (14:30 PT): source `~/PROJECTS/claude-ops-starter-kit` = main, clean, no remote, 27 skills, README says 27 / "20 cases" (actual 41). Free tree = `~/PROJECTS/claude-code-ops-kit-public` (`coterihq/autosave`), main = origin, 25 skills, README already 25 / 41; untracked `release/` (build_free.py zips THIS repo from `release/free-files.txt`, 64 entries). `allow_auto_merge` = false on coterihq/autosave. `migration-auditor` in guard.py + 4 skills (source).
 1. Where: branch + PR on `coterihq/autosave`; same diff applied to source via `git apply` on a local source branch. Commit `release/` in the PR. (Q1a/Q7a)
-2. Auto-merge: Phil enables "Allow auto-merge" on coterihq/autosave before stage 8. (Q2a)
+2. Auto-merge: the maintainer enables "Allow auto-merge" on coterihq/autosave before stage 8. (Q2a)
 3. Claims test runs against the free tree; counts skills from the manifest; fails if any file under skills/, hooks/, tests/ is missing from `free-files.txt`. (Q3a/Q8a)
 4. Release: v1.2, file `autosave.zip` (stable name); new `VERSION` + `CHANGELOG.md`; both + new tests + fixtures added to the manifest. (Q4a/Q8a)
-5. Phil's live `~/.claude/hooks`: out of scope; follow-up after stage 9 if 3b confirms the dedupe bug (pace baseline may be inflated). (Q5a)
+5. the maintainer's live `~/.claude/hooks`: out of scope; follow-up after stage 9 if 3b confirms the dedupe bug (pace baseline may be inflated). (Q5a)
 6. Spend check: headless `claude -p "<small task, spawns a subagent>" --output-format json` → `total_cost_usd` vs `session_stats` on that transcript, ±10%; plus structural check: no duplicate `message.id` usage counted. No live settings.json edits. (Q6a+c/Q9a)
 Baseline correction: the "README says 27 / 20" items apply to the source repo; the free tree already reads 25 / 41.
 
 ## Stage 3b results (2026-11-09)
 - #1 Verified (docs). #2 Verified: 28 usage lines / 9 distinct messages in a local transcript (~3.1x overcount). #3 Verified: `<session>/subagents/agent-*.jsonl`, no id overlap with main. #4 fields Verified; subagent inclusion in native cost undocumented (Task 9 measures both).
-- A2/A3 DROPPED (Phil): docs say PreCompact stdout "becomes instructions for the compaction summary", so README L38 is true.
+- A2/A3 DROPPED (maintainer): docs say PreCompact stdout "becomes instructions for the compaction summary", so README L38 is true.
 
 ## Out of scope
 New guards, secret scanning, plugin packaging, Linux/Windows support, Code Red/Quick Save code changes.

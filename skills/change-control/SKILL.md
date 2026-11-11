@@ -33,4 +33,4 @@ Classify, then run only the relevant branch.
 Never run every branch.
 
 ## Parallel writing boundary
-This free kit does not include a parallel-agent coordination workflow. Do not dispatch concurrent writers without a separately reviewed coordination plan; use one writer at a time otherwise. Code Red (paid, https://coterihq.gumroad.com) adds a reviewed parallel-agent coordination workflow.
+This free kit does not include a parallel-agent coordination workflow. Do not dispatch concurrent writers without a separately reviewed coordination plan; use one writer at a time otherwise. Final Boss (paid, https://coterihq.gumroad.com) adds a reviewed parallel-agent coordination workflow.
