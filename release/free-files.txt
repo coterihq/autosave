@@ -5,9 +5,11 @@ LICENSE
 QUICKSTART.md
 README.md
 THIRD-PARTY-NOTICES.md
+commands/bad.md
 commands/claude-audit.md
 commands/dormant.md
 commands/handoff.md
+commands/learn.md
 commands/make-chart.md
 commands/make-deck.md
 commands/make-diagram.md
@@ -23,6 +25,7 @@ hooks/check_rule_sync.py
 hooks/footer_check.py
 hooks/guard.py
 hooks/guard_tests.py
+hooks/learn.py
 hooks/migration_check.py
 hooks/precompact_dump.py
 hooks/session_inject.py
@@ -64,6 +67,7 @@ skills/truth-to-screen-trace/SKILL.md
 tests/upgrade_test.sh
 tests/hooks_test.py
 tests/claims_test.py
+tests/fixtures/learn_transcript.jsonl
 tests/fixtures/transcript_dup.jsonl
 tests/fixtures/statusline_input.json
 tests/fixtures/subagents/agent-a.jsonl

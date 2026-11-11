@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Learn (off by default): `hooks/learn.py`, `/learn` and `/bad`. Captures your corrections, offers to save one as a rule (moment mode) or lets you review them later (batch mode), and keeps each rule with its receipts. A rule fails on its second confirmed repeat.
+- Switches: `LEARN`, `LEARN_MODE`, `LEARN_TRIAL_DAYS` in `kit.conf`. See the README "Learn" section.
+
 ## 1.2.1 — 2026-11-09
 
 - `guard.py`: the live-mode block now catches quoted values (`DRY_RUN="false"`, `TESTNET='0'`), prefixed names (`BOT_DRY_RUN=false`), and `--live` followed by `;`, `&`, `|`, `)` or `=1`. `--live=false`, `DRY_RUN="true"` and quoted mentions still pass. A config file changed with an editor tool is still not covered.

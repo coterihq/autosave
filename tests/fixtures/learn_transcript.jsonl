@@ -1,0 +1,10 @@
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "I renamed the file."}]}}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": {"kind": "human"}, "message": {"role": "user", "content": "No, still wrong"}, "promptId": "p1"}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": {"kind": "human"}, "message": {"role": "user", "content": "<command-message>bad</command-message>\n<command-name>/bad</command-name>\n<command-args>too long</command-args>"}, "promptId": "p2"}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": {"kind": "human"}, "message": {"role": "user", "content": "no problem, thanks"}, "promptId": "p3"}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": {"kind": "human"}, "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]}, "promptId": "px"}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": {"kind": "human"}, "message": {"role": "user", "content": "No, meta"}, "promptId": "pm", "isMeta": true}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": true, "origin": {"kind": "human"}, "message": {"role": "user", "content": "No issues found"}, "promptId": "ps"}
+{not json
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": null, "message": {"role": "user", "content": "No"}, "promptId": "pz", "promptSource": "sdk"}
+{"type": "user", "uuid": "u", "sessionId": "s1", "timestamp": "2026-11-10T16:00:00.000Z", "isSidechain": false, "origin": {"kind": "human"}, "message": {"role": "user", "content": [{"type": "image", "source": {}}, {"type": "text", "text": "wrong file"}]}, "promptId": "p4"}

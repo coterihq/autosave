@@ -7,7 +7,10 @@
     "CLAUDE_CONTEXT_WARN_TOKENS": "{{CONTEXT_WARN_TOKENS}}",
     "CLAUDE_FOOTER_MARKER": "{{FOOTER_MARKER}}",
     "CLAUDE_FOOTER_DISABLE": "{{FOOTER_DISABLE}}",
-    "CLAUDE_KIT_INVARIANTS": "{{INVARIANTS}}"
+    "CLAUDE_KIT_INVARIANTS": "{{INVARIANTS}}",
+    "CLAUDE_LEARN": "{{LEARN}}",
+    "CLAUDE_LEARN_MODE": "{{LEARN_MODE}}",
+    "CLAUDE_LEARN_TRIAL_DAYS": "{{LEARN_TRIAL_DAYS}}"
   },
   "hooks": {
     "PreToolUse": [
@@ -28,7 +31,12 @@
       {"matcher": "",
        "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/precompact_dump.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]}
     ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/learn.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]}
+    ],
     "SessionStart": [
+      {"matcher": "startup",
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/learn.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]},
       {"matcher": "compact",
        "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/session_inject.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
       {"matcher": "resume",
@@ -36,7 +44,8 @@
     ],
     "Stop": [
       {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/footer_check.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]},
-      {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/usage_guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]}
+      {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/usage_guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]},
+      {"hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/learn.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 10}]}
     ]
   },
   "statusLine": {
