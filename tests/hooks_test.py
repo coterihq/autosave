@@ -239,6 +239,121 @@ def test_learn_consumed_answer_not_recorded():
 def test_learn_missing_transcript_is_empty_not_crash():
     assert learn.user_turns(Path("/nonexistent/x.jsonl")) == []
 
+def test_learn_user_turns_bad_path_is_empty():
+    assert learn.user_turns(None) == []
+
+
+def test_learn_sidechain_reply_not_used_as_prev():
+    f = Path(tempfile.mkdtemp(prefix="autosave-test-")) / "t.jsonl"
+    rows = [{"type": "assistant", "message": {"content": [{"type": "text", "text": "MAIN"}]}},
+            {"type": "assistant", "isSidechain": True, "message": {"content": [{"type": "text", "text": "SIDE"}]}},
+            {"type": "user", "sessionId": "s", "promptId": "q1", "origin": {"kind": "human"}, "message": {"content": "no, redo"}}]
+    f.write_text("\n".join(json.dumps(r) for r in rows))
+    assert learn.user_turns(f)[0]["prev_reply"] == "MAIN"
+
+
+def _st(*rules, corrections=(), days=(), quarantined=0):
+    st = learn._fresh()
+    st["rules"] = [dict({"id": i + 1, "text": "r%d" % (i + 1), "created": "2026-11-01", "state": "trial",
+                         "trial_start": "2026-11-01", "receipts": [], "repeats": []}, **r) for i, r in enumerate(rules)]
+    st["corrections"] = [dict({"key": "k", "ts": "", "session_id": "s", "project_path": "/p", "text": "t", "prev_reply": "",
+                               "source": "detector", "state": "pending", "rule_id": None}, **c) for c in corrections]
+    st["active_days"] = list(days); st["quarantined"] = quarantined
+    return st
+
+
+def _pend(*keys):
+    return [{"key": k} for k in keys]
+
+
+def test_learn_approve_writes_trial_rule():
+    home = tmp_home()
+    with _home(home):
+        learn.mutate(lambda s: (True, s["corrections"].extend(_st(corrections=_pend("k1"))["corrections"])))
+        ok, msg = learn.mutate(lambda s: (True, learn.approve(s, "k1", "Use tabs", "2026-11-10")))
+        assert ok, msg
+        txt = learn.paths()[2].read_text()
+    assert "- Use tabs _(on trial since 2026-11-10)_" in txt
+
+
+def test_learn_rule_text_rejected():
+    st = _st(corrections=_pend("k1"))
+    for bad in ["x" * 201, "@~/x.md", "# heading", "  "]:
+        ok, msg = learn.approve(st, "k1", bad, "2026-11-10")
+        assert not ok and "one line" in msg, bad
+    ok, _ = learn.approve(st, "k1", "a\nb", "2026-11-10")
+    assert ok and st["rules"][0]["text"] == "a b"
+    assert not learn.approve(st, "nope", "ok", "2026-11-10")[0]
+
+
+def test_learn_held_after_14_active_days():
+    days = ["2026-11-%02d" % d for d in range(2, 15)]  # 13 later days
+    st = _st({"trial_start": "2026-11-01"}, days=["2026-11-01"] + days)
+    assert not learn.promote(st, "2026-11-14", 14) and st["rules"][0]["state"] == "trial"
+    st["active_days"].append("2026-11-15")
+    assert learn.promote(st, "2026-11-15", 14) and st["rules"][0]["state"] == "held"
+    assert "no repeat seen since 2026-11-01" in learn.render_rules(st)
+
+
+def test_learn_second_repeat_fails_rule():
+    st = _st({}, corrections=_pend("a", "b"))
+    learn.repeat(st, "a", 1); learn.repeat(st, "a", 1)
+    assert st["rules"][0]["repeats"] == ["a"] and st["rules"][0]["state"] == "trial"
+    assert "r1" in learn.render_rules(st)
+    learn.repeat(st, "b", 1)
+    assert st["rules"][0]["state"] == "failed" and "r1" not in learn.render_rules(st)
+
+
+def test_learn_edit_resets_trial():
+    st = _st({"state": "held"})
+    ok, _ = learn.edit(st, 1, "new text", "2026-11-10")
+    assert ok and st["rules"][0]["state"] == "trial" and st["rules"][0]["trial_start"] == "2026-11-10"
+    assert st["rules"][0]["text"] == "new text"
+
+
+def test_learn_cap_blocks_16th():
+    st = _st(*[{} for _ in range(15)], corrections=_pend("k1"))
+    ok, msg = learn.approve(st, "k1", "one more", "2026-11-10")
+    assert not ok and "retire" in msg
+    assert learn.retire(st, 3)[0]
+    assert learn.approve(st, "k1", "one more", "2026-11-10")[0]
+
+
+def test_learn_concurrent_approve_at_cap():
+    home = tmp_home()
+    seed = _st(*[{} for _ in range(14)], corrections=_pend("k1", "k2"))
+    with _home(home):
+        learn.mutate(lambda s: (True, s.update(seed)))
+    e = dict(os.environ, HOME=str(home))
+    ps = [subprocess.Popen([sys.executable, str(HOOKS / "learn.py"), "approve", "--key", k, "--text", "t" + k],
+                           stdout=subprocess.PIPE, text=True, env=e) for k in ("k1", "k2")]
+    outs = [p.communicate()[0] for p in ps]
+    with _home(home):
+        st = learn.load()
+    assert sum(r["state"] == "trial" for r in st["rules"]) == 15
+    assert sum("retire" in o for o in outs) == 1 and all(p.returncode == 0 for p in ps)
+
+
+def test_learn_kill_report():
+    good = _st(*[{} for _ in range(5)],
+               corrections=[{"key": "a", "state": "ruled"}, {"key": "b", "state": "dismissed"}, {"key": "c", "state": "repeat"}])
+    lines = [l for l in learn.status(good, "2026-11-10", kill=True).splitlines() if l.startswith(("PASS", "FAIL"))]
+    assert len(lines) == 4 and all(l.startswith("PASS") for l in lines), lines
+    bad = _st({}, corrections=[{"key": "a", "state": "ruled"}] + [{"key": "d%d" % i, "state": "dismissed"} for i in range(5)] + [{"key": "a"}],
+              quarantined=1)
+    lines = [l for l in learn.status(bad, "2026-11-10", kill=True).splitlines() if l.startswith(("PASS", "FAIL"))]
+    assert len(lines) == 4 and all(l.startswith("FAIL") for l in lines), lines
+
+
+def test_learn_output_never_says_proven_or_works():
+    import re
+    st = _st({"state": "held", "receipts": ["k"]}, {"state": "failed", "repeats": ["a", "b"]},
+             corrections=[{"key": "k", "text": "nope", "prev_reply": "done"}, {"key": "z", "state": "repeat", "rule_id": 1}],
+             quarantined=1, days=["2026-11-02"])
+    out = "\n".join([learn.render_rules(st), learn.status(st, "2026-11-10", kill=True), learn.pending(st),
+                     learn.approve(st, "k", "x" * 201, "2026-11-10")[1], learn.retire(st, 99)[1]])
+    assert not re.search(r"\b(proven|works)\b", out, re.I), out
+
 
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
