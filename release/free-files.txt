@@ -65,6 +65,7 @@ skills/truth-to-screen-trace/SKILL.md
 tests/upgrade_test.sh
 tests/hooks_test.py
 tests/claims_test.py
+tests/fixtures/learn_transcript.jsonl
 tests/fixtures/transcript_dup.jsonl
 tests/fixtures/statusline_input.json
 tests/fixtures/subagents/agent-a.jsonl

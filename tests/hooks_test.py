@@ -198,6 +198,48 @@ def test_learn_unchanged_mutate_does_not_rewrite():
         assert not learn.paths()[0].exists()
 
 
+def test_learn_redact_word_boundary():
+    assert learn.redact("no, use task-specific-config-file") == "no, use task-specific-config-file"
+    assert learn.redact("no, the key is sk-abcdefghijklmnopqrstuv") == "[redacted]"
+
+
+def test_learn_detector_phrases():
+    for t in ["no, not that", "Nope", "wrong", "undo that", "revert it", "redo", "not that one", "that's not it"]:
+        assert learn.is_correction(t), t
+    for t in ["no problem", "No worries!", "nothing yet", "note this", "know what", "wrongly named but fine"]:
+        assert not learn.is_correction(t), t
+
+
+def test_learn_recorder_keeps_typed_turns_only():
+    turns = learn.user_turns(FIX / "learn_transcript.jsonl")
+    assert [t["key"] for t in turns] == ["p1", "p2", "p3", "p4"]
+    st = dict(learn.EMPTY, corrections=[], active_days=[])
+    assert learn.record(st, "s1", "/proj", turns, set(), "2026-11-10")
+    assert [(c["key"], c["source"]) for c in st["corrections"]] == [("p1", "detector"), ("p2", "bad"), ("p4", "detector")]
+    assert st["corrections"][0]["prev_reply"] and st["corrections"][1]["text"] == "too long"
+    assert st["active_days"] == ["2026-11-10"]
+
+
+def test_learn_record_twice_adds_nothing():
+    turns = learn.user_turns(FIX / "learn_transcript.jsonl")
+    st = dict(learn.EMPTY, corrections=[], active_days=[])
+    learn.record(st, "s1", "/proj", turns, set(), "2026-11-10")
+    n = len(st["corrections"])
+    assert not learn.record(st, "s1", "/proj", turns, set(), "2026-11-10")
+    assert len(st["corrections"]) == n
+
+
+def test_learn_consumed_answer_not_recorded():
+    turns = learn.user_turns(FIX / "learn_transcript.jsonl")
+    st = dict(learn.EMPTY, corrections=[], active_days=[])
+    learn.record(st, "s1", "/proj", turns, {"p1"}, "2026-11-10")
+    assert "p1" not in [c["key"] for c in st["corrections"]]
+
+
+def test_learn_missing_transcript_is_empty_not_crash():
+    assert learn.user_turns(Path("/nonexistent/x.jsonl")) == []
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

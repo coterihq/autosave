@@ -3,13 +3,13 @@
 
 State: ~/.claude/learn/learn.json (mode 600), lock: learn.lock, export: ~/.claude/rules/learned-rules.md.
 """
-import fcntl, json, os, re, shutil, sys, datetime as dt
+import fcntl, hashlib, json, os, re, shutil, sys, datetime as dt
 from pathlib import Path
 
 EMPTY = {"corrections": [], "rules": [], "active_days": [], "last_nudge": "", "quarantined": 0}
 # ponytail: pattern list, not entropy detection; extend when a miss is reported.
 SECRET_RE = re.compile(
-    r"sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}"
+    r"\bsk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY|(?i:(password|passwd|secret|api[_-]?key|token)\s*[:=]\s*\S{6,})")
 
 
@@ -66,3 +66,65 @@ def mutate(fn):
 def redact(text):
     """'[redacted]' if text looks like it holds a secret, else its first 200 chars."""
     return "[redacted]" if SECRET_RE.search(text) else text[:200]
+
+
+CORRECTION_RE = re.compile(
+    r"\s*(?:no(?! problem| worries)|nope|wrong|undo|revert|redo|not that|that'?s not)\b", re.I)
+
+
+def is_correction(text):
+    return bool(CORRECTION_RE.match(text))
+
+
+def _text(content):
+    """First text of a message body; None for tool results or no text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list) and not any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+        return next((b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"), None)
+
+
+def user_turns(transcript):
+    """Typed human turns of a transcript as dicts; an unreadable file or bad line is skipped."""
+    out, prev = [], ""
+    try:
+        lines = Path(transcript).read_text(errors="replace").splitlines()
+    except OSError:
+        return out
+    for ln in lines:
+        try:
+            row = json.loads(ln)
+            msg = row["message"]
+            text = _text(msg["content"])
+            if row["type"] == "assistant":
+                prev = (_text(msg["content"]) or prev)[:200]  # tool-only rows keep the last text
+                continue
+            if row["type"] != "user" or text is None or (row.get("origin") or {}).get("kind") != "human" \
+                    or row.get("isMeta") or row.get("isSidechain"):
+                continue
+            source = "detector"
+            if "<command-name>/bad</command-name>" in text:
+                m = re.search(r"<command-args>(.*?)</command-args>", text, re.S)
+                source, text = "bad", (m.group(1).strip() if m else "") or "/bad"
+            key = row.get("promptId") or hashlib.sha1((str(row.get("sessionId")) + text).encode()).hexdigest()
+            out.append({"key": key, "ts": row.get("timestamp") or "", "text": text, "prev_reply": prev, "source": source})
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+    return out
+
+
+def record(state, session_id, project_path, turns, consumed, today):
+    """Append pending corrections for new bad/detector turns; True if state changed."""
+    seen = {c["key"] for c in state["corrections"]}
+    n = len(state["corrections"])
+    for t in turns:
+        if t["key"] in consumed or t["key"] in seen or not (t["source"] == "bad" or is_correction(t["text"])):
+            continue
+        seen.add(t["key"])
+        state["corrections"].append({"key": t["key"], "ts": t["ts"], "session_id": session_id, "project_path": project_path,
+                                     "text": redact(t["text"]), "prev_reply": redact(t["prev_reply"]),
+                                     "source": t["source"], "state": "pending", "rule_id": None})
+    if turns and today not in state["active_days"]:
+        state["active_days"].append(today)
+        return True
+    return len(state["corrections"]) > n
