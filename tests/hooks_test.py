@@ -156,6 +156,48 @@ def test_ledger_with_non_numeric_values_recovers():
     assert "error" not in r.stdout + r2.stdout, r.stdout + r2.stdout
 
 
+# --- Learn ---
+import contextlib
+import learn
+
+
+@contextlib.contextmanager
+def _home(home):
+    old = os.environ.get("HOME"); os.environ["HOME"] = str(home)
+    try:
+        yield
+    finally:
+        if old is None: os.environ.pop("HOME", None)
+        else: os.environ["HOME"] = old
+
+
+def test_learn_corrupt_state_quarantined_and_reported():
+    home = tmp_home(); d = home / ".claude" / "learn"; d.mkdir(parents=True)
+    (d / "learn.json").write_text("{not json")
+    with _home(home):
+        st = learn.load()
+    assert st["quarantined"] == 1 and st["rules"] == []
+    assert [p for p in d.iterdir() if ".corrupt-" in p.name]
+
+
+def test_learn_state_mode_600_and_redaction():
+    home = tmp_home()
+    with _home(home):
+        learn.mutate(lambda s: (True, s["active_days"].append("2026-11-10")))
+        f = learn.paths()[0]
+    assert oct(f.stat().st_mode)[-3:] == "600"
+    assert learn.redact("no, use api_key=abcd1234efgh") == "[redacted]"
+    assert learn.redact("no, the other file") == "no, the other file"
+    assert len(learn.redact("x" * 300)) == 200
+
+
+def test_learn_unchanged_mutate_does_not_rewrite():
+    home = tmp_home()
+    with _home(home):
+        assert learn.mutate(lambda s: (False, "r")) == "r"
+        assert not learn.paths()[0].exists()
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in list(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

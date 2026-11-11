@@ -23,6 +23,7 @@ hooks/check_rule_sync.py
 hooks/footer_check.py
 hooks/guard.py
 hooks/guard_tests.py
+hooks/learn.py
 hooks/migration_check.py
 hooks/precompact_dump.py
 hooks/session_inject.py
