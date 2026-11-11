@@ -437,6 +437,36 @@ def test_learn_missing_session_id_is_silent():
     assert r.returncode == 0 and r.stdout == "" and not (home / ".claude" / "learn").exists()
 
 
+def _asked_without_offer(env):
+    home = tmp_home()
+    run_hook("learn.py", _stop("p1", "Fixed. Save this as a rule? Proposed: use tabs"), home, env)
+    out = run_hook("learn.py", _ups("p2", "no"), home, env).stdout
+    tp = _transcript(home, "t.jsonl", [("p1", "make it shorter"), ("p2", "no")])
+    run_hook("learn.py", _stop("p2", "ok", tp), home, env)
+    return out, [c["key"] for c in _state(home)["corrections"]]
+
+
+def test_learn_question_without_offer_then_no_is_consumed():
+    out, keys = _asked_without_offer(LON)
+    assert out == "" and "p2" not in keys, (out, keys)
+
+
+def test_learn_batch_mode_answer_is_consumed():
+    out, keys = _asked_without_offer(dict(LON, CLAUDE_LEARN_MODE="batch"))
+    assert out == "" and "p2" not in keys, (out, keys)
+
+
+def test_learn_double_stop_keeps_offer():
+    home = tmp_home()
+    assert "Save this as a rule?" in run_hook("learn.py", _ups("p1", "no, wrong"), home, LON).stdout
+    run_hook("learn.py", _stop("p1", "Fixed."), home, LON)
+    run_hook("learn.py", _stop("p1", "Save this as a rule? Proposed: use tabs"), home, LON)
+    assert run_hook("learn.py", _ups("p2", "no"), home, LON).stdout == ""
+    tp = _transcript(home, "t.jsonl", [("p1", "no, wrong"), ("p2", "no")])
+    run_hook("learn.py", _stop("p2", "ok", tp), home, LON)
+    assert [c["key"] for c in _state(home)["corrections"]] == ["p1"]
+
+
 def test_learn_batch_mode_no_injection():
     r = run_hook("learn.py", _ups("p1", "no, wrong"), tmp_home(), dict(LON, CLAUDE_LEARN_MODE="batch"))
     assert r.returncode == 0 and r.stdout == ""

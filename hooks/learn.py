@@ -335,12 +335,14 @@ def hook(payload, today):
     if ev == "SessionStart":
         return _nudge(today) if batch else ""
     if ev == "UserPromptSubmit":
-        if batch or "agent_id" in payload or not pid:
+        if "agent_id" in payload or not pid:
             return ""
         f = _offer_file(sid); o = _read_offer(f)
         if o["open"]:
             o["consumed"].append(pid); o["open"] = None
             _write_offer(f, o)
+            return ""
+        if batch:
             return ""
         if is_correction(payload.get("prompt", "")):
             o["asked_pending"] = pid  # an unfinished earlier turn (never reached Stop) is simply replaced
@@ -349,11 +351,13 @@ def hook(payload, today):
         return ""
     if ev == "Stop":
         f = _offer_file(sid); o = _read_offer(f)
-        if pid and o["asked_pending"] == pid:
-            last = payload.get("last_assistant_message") or ""
-            if "Save this as a rule?" in last or "Count as a repeat of rule" in last:
-                o["open"] = pid
-            o["asked_pending"] = None
+        last = payload.get("last_assistant_message") or ""
+        asked = "Save this as a rule?" in last or "Count as a repeat of rule" in last
+        if pid and (asked or o["asked_pending"] == pid):
+            if asked:
+                o["open"] = pid  # also covers /learn and /bad, which ask with no offer behind them
+            if o["asked_pending"] == pid:
+                o["asked_pending"] = None
             _write_offer(f, o)
         turns = user_turns(payload.get("transcript_path"))
         mutate(lambda st: (record(st, sid, payload.get("cwd", ""), turns, set(o["consumed"]), today)
