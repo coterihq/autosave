@@ -405,9 +405,36 @@ def test_learn_offer_then_no_is_consumed():
 
 def test_learn_offer_not_asked_closes():
     home = tmp_home()
+    tp = _transcript(home, "t.jsonl", [("p1", "no, wrong")])
     assert "Save this as a rule?" in run_hook("learn.py", _ups("p1", "no, wrong"), home, LON).stdout
-    run_hook("learn.py", _stop("p1", "Fixed."), home, LON)
+    run_hook("learn.py", _stop("p1", "Fixed.", tp), home, LON)
     assert "Save this as a rule?" in run_hook("learn.py", _ups("p2", "no, still wrong"), home, LON).stdout
+    c = _state(home)["corrections"]
+    assert [(x["key"], x["state"]) for x in c] == [("p1", "pending")]
+
+
+def test_learn_interrupted_turn_does_not_swallow_next_correction():
+    home = tmp_home()
+    assert "Save this as a rule?" in run_hook("learn.py", _ups("p1", "no, wrong"), home, LON).stdout
+    # no Stop for p1: the user interrupted
+    assert "Save this as a rule?" in run_hook("learn.py", _ups("p2", "no, still wrong"), home, LON).stdout
+    tp = _transcript(home, "t.jsonl", [("p1", "no, wrong"), ("p2", "no, still wrong")])
+    run_hook("learn.py", _stop("p2", "Fixed.", tp), home, LON)
+    assert sorted(c["key"] for c in _state(home)["corrections"]) == ["p1", "p2"]
+
+
+def test_learn_missing_prompt_id_skips_offer():
+    home = tmp_home()
+    p = _ups("p1", "no, wrong"); del p["prompt_id"]
+    r = run_hook("learn.py", p, home, LON)
+    assert r.returncode == 0 and r.stdout == "" and not list((home / ".claude").glob("learn/offer-*"))
+
+
+def test_learn_missing_session_id_is_silent():
+    home = tmp_home()
+    p = _ups("p1", "no, wrong"); del p["session_id"]
+    r = run_hook("learn.py", p, home, LON)
+    assert r.returncode == 0 and r.stdout == "" and not (home / ".claude" / "learn").exists()
 
 
 def test_learn_batch_mode_no_injection():

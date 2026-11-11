@@ -297,9 +297,9 @@ def _offer_file(sid):
 def _read_offer(f):
     try:
         o = json.loads(f.read_text())
-        return {"open": o.get("open"), "consumed": list(o.get("consumed", []))}
+        return {"asked_pending": o.get("asked_pending"), "open": o.get("open"), "consumed": list(o.get("consumed", []))}
     except (OSError, ValueError, AttributeError, TypeError):
-        return {"open": None, "consumed": []}
+        return {"asked_pending": None, "open": None, "consumed": []}
 
 
 def _write_offer(f, o):
@@ -328,29 +328,32 @@ def hook(payload, today):
     """Text to print for one hook event; "" for nothing."""
     if os.environ.get("CLAUDE_LEARN") != "on":
         return ""
-    ev, sid = payload.get("hook_event_name"), payload.get("session_id")
+    ev, sid, pid = payload.get("hook_event_name"), payload.get("session_id"), payload.get("prompt_id")
+    if not sid:
+        return ""
     batch = os.environ.get("CLAUDE_LEARN_MODE") == "batch"
     if ev == "SessionStart":
         return _nudge(today) if batch else ""
     if ev == "UserPromptSubmit":
-        if batch or "agent_id" in payload:
+        if batch or "agent_id" in payload or not pid:
             return ""
         f = _offer_file(sid); o = _read_offer(f)
         if o["open"]:
-            o["consumed"].append(payload.get("prompt_id")); o["open"] = None
+            o["consumed"].append(pid); o["open"] = None
             _write_offer(f, o)
             return ""
         if is_correction(payload.get("prompt", "")):
-            o["open"] = payload.get("prompt_id")
+            o["asked_pending"] = pid  # an unfinished earlier turn (never reached Stop) is simply replaced
             _write_offer(f, o)
             return OFFER_LINE.format(py=Path(__file__).resolve())
         return ""
     if ev == "Stop":
         f = _offer_file(sid); o = _read_offer(f)
-        last = payload.get("last_assistant_message") or ""
-        if o["open"] and o["open"] == payload.get("prompt_id") and "Save this as a rule?" not in last \
-                and "Count as a repeat of rule" not in last:
-            o["open"] = None
+        if pid and o["asked_pending"] == pid:
+            last = payload.get("last_assistant_message") or ""
+            if "Save this as a rule?" in last or "Count as a repeat of rule" in last:
+                o["open"] = pid
+            o["asked_pending"] = None
             _write_offer(f, o)
         turns = user_turns(payload.get("transcript_path"))
         mutate(lambda st: (record(st, sid, payload.get("cwd", ""), turns, set(o["consumed"]), today)
