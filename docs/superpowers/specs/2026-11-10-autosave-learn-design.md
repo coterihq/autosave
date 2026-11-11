@@ -67,11 +67,16 @@ Live tests run 2026-11-10 (Claude Code 2.1.322, throwaway hooks loaded with
   `commands/learn.md` give the exact unquoted command to run, and the allow
   rule is optional: without it each approval shows one permission prompt.
 
-Still open (needs a person looking at the terminal, plan task 0): whether a
-SessionStart hook's JSON `systemMessage` is shown to the user. The headless
-stream carries it in the hook response, which does not show what the
-interactive UI prints. If it is not shown, batch mode's nudge moves to the
-Stop hook.
+Interactive check, 2026-11-10: a SessionStart hook that prints
+`{"systemMessage": ...}` CAN be shown to the user, as
+`SessionStart:startup says: <text>` (claude-mem's launcher does exactly this
+and its line was displayed). Our own test hook ran in the same session
+(logged) and printed the same JSON shape, but its line was not displayed.
+Cause not established; the likeliest reading is that when several hooks send
+a message at session start, not all are shown. So the batch nudge is
+best-effort on a machine with other session-start messages. Batch mode is not
+the default, `/learn` always shows the pending count, and the dogfood run
+records whether the nudge was ever seen.
 
 ## Structure
 
