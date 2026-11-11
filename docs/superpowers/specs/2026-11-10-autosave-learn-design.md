@@ -1,6 +1,6 @@
 # Autosave Learn: rules from corrections, with receipts
 
-Status: design rev 2, 2026-11-10. Rev 1 was red-teamed by an independent
+Status: design rev 2.1, 2026-11-10. Rev 1 was red-teamed by an independent
 reviewer (verdict: Revise; 3 critical, 7 high). This revision applies those
 fixes. No code yet.
 Target: Autosave v1.3, free tier. Ships enabled only if the kill criterion
@@ -97,8 +97,20 @@ shipped copy would be overwritten on every reinstall):
 - `~/.claude/learn/offer-<session_id>.json`. Per-session offer state, so the
   prompt hook never contends for the main file.
 
-Reused from `hooks/usage_guard.py` by import, not copied: the real-user-turn
-filter, ledger load with quarantine, atomic save.
+Rev 2.1 corrections, found when reading the code for the plan:
+- Nothing is imported from `usage_guard.py`: its load and save are tied to its
+  own file and schema, and it has no typed-turn filter. `learn.py` carries its
+  own small load, quarantine and save, following the same pattern.
+- `guard.py` has no credential-shape check to reuse; `learn.py` has its own
+  short pattern list.
+- The kit registers a hook as one script with no arguments, so `learn.py` run
+  without arguments dispatches on `hook_event_name`. `record`, `offer` and
+  `nudge` are internal handlers, not subcommands; the CLI has the other eight.
+- Switch names carry the kit's prefix: `CLAUDE_LEARN`, `CLAUDE_LEARN_MODE`,
+  `CLAUDE_LEARN_TRIAL_DAYS`, set from `LEARN*` keys in `kit.conf`.
+- The Stop handler closes an open offer when Claude's reply did not contain
+  the exact question, so a false detection cannot swallow the next real
+  correction.
 
 ## Data (`learn.json`)
 
@@ -116,8 +128,7 @@ last_nudge:    ISO date
 
 - `key` is the transcript row's `promptId` (the hook's `prompt_id`), or
   sha1(session_id + text) when a row has none.
-- Text that trips `guard.py`'s credential-shape check is stored as
-  `[redacted]`.
+- Text matching `learn.py`'s credential patterns is stored as `[redacted]`.
 
 ## Recorder (`record`, on Stop, both modes)
 
@@ -207,7 +218,7 @@ Autosave variables. `LEARN=off` makes every Learn hook exit at once.
 ## Failure handling
 
 - Every Learn hook exits 0 on any error.
-- A `learn.json` that fails to parse is quarantined by the reused loader, a new
+- A `learn.json` that fails to parse is quarantined (renamed aside), a new
   one is started, and `/learn` reports it.
 - `learned-rules.md` is regenerated whole on every state change; its header
   says hand edits are overwritten.
