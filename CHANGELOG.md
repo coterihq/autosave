@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Learn: the correction detector reads the whole prompt, not just its first word. It now also catches failure reports ("didnt work", "still unclickable"), "I meant" / "I thought we", wrong-target replies and standing preferences ("from now on", "treat X as Y"). On an unseen sample it caught 3 of 5 corrections, where the old one caught 0. Prompts of 300+ characters and pasted content are not counted. "redo" no longer counts: it is an instruction.
+- Learn: stored text masks emails, phone numbers and runs of 6+ digits, and a dismissed correction keeps no copy of its text.
+
 ## 1.3.0 — 2026-11-11
 
 - Learn (off by default): `hooks/learn.py`, `/learn` and `/bad`. Captures your corrections, offers to save one as a rule (moment mode) or lets you review them later (batch mode), and keeps each rule with its receipts. A rule fails on its second confirmed repeat.
