@@ -78,17 +78,32 @@ def mutate(fn):
         return result
 
 
+# Personal data in a prompt (patients, accounts, contacts): masked, not stored. Emails, phone-shaped
+# numbers, and any run of 6+ digits (record, account, member ids).
+PII_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+|\+?\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4}|\d{6,}")
+
+
 def redact(text):
-    """'[redacted]' if text looks like it holds a secret, else its first 200 chars."""
-    return "[redacted]" if SECRET_RE.search(text) else text[:200]
+    """'[redacted]' if text looks like it holds a secret, else its first 200 chars with personal data masked."""
+    return "[redacted]" if SECRET_RE.search(text) else PII_RE.sub("[pii]", text[:200])
 
 
+# A correction is the user saying the last answer missed. v1 only matched a correction word at the very
+# start ("no", "wrong", ...) and caught 0 of 5 corrections in an unseen sample. v2 searches the whole prompt
+# for four families: wrong target, a failure report, "I meant", and a standing preference. "redo" is gone
+# (it is an instruction). Long or pasted prompts are briefs, not corrections.
 CORRECTION_RE = re.compile(
-    r"\s*(?:no(?! problem| worries)|nope|wrong|undo|revert|redo|not that|that'?s not)\b", re.I)
+    r"^\s*(?:no(?! problem| worries)|nope|wrong|not that|that'?s not|undo|revert)\b"
+    r"|\b(?:didn'?t|doesn'?t|does not|did not|isn'?t|not|stopped|still not)\s+(?:work|load|show|render|sav|updat)\w*"
+    r"|\bstill (?:un\w+|broken|failing|wrong|the same|blank|empty)\b|\bbroken\b|\bwrong\b"
+    r"|\bi (?:actually )?meant\b|\bi thought (?:we|you)\b|\bwhat happened to\b"
+    r"|\bdifferent (?:project|one|thing|file|tab)\b"
+    r"|\b(?:from now on|going forward|at this point forward|for any and all|every time|always|never|remember)\b"
+    r"|\btreat .{1,40} as\b", re.I)
 
 
 def is_correction(text):
-    return bool(CORRECTION_RE.match(text))
+    return len(text) < 300 and "<pasted_content" not in text and bool(CORRECTION_RE.search(text))
 
 
 def _text(content):
@@ -204,6 +219,7 @@ def dismiss(state, key):
     if c["state"] != "pending":
         return False, "no pending correction with key %s" % key
     c["state"] = "dismissed"
+    c["text"] = c["prev_reply"] = ""  # nothing reads a dismissed correction again; keep no copy of it
     return True, "dismissed %s" % key
 
 
