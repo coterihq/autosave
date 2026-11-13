@@ -189,6 +189,9 @@ def test_learn_state_mode_600_and_redaction():
     assert learn.redact("no, use api_key=abcd1234efgh") == "[redacted]"
     assert learn.redact("no, the other file") == "no, the other file"
     assert len(learn.redact("x" * 300)) == 200
+    assert learn.redact("no, email jo@x.org re MRN 12345678, call 555-123-4567") == \
+        "no, email [pii] re MRN [pii], call [pii]"
+    assert learn.redact("no, use port 8080 and v1.2") == "no, use port 8080 and v1.2"
 
 
 def test_learn_unchanged_mutate_does_not_rewrite():
@@ -204,10 +207,25 @@ def test_learn_redact_word_boundary():
 
 
 def test_learn_detector_phrases():
-    for t in ["no, not that", "Nope", "wrong", "undo that", "revert it", "redo", "not that one", "that's not it"]:
+    for t in ["no, not that", "Nope", "wrong", "undo that", "revert it", "not that one", "that's not it",
+              # v2: anywhere in the prompt, not just its first word (real misses from an unseen sample)
+              "didnt work", "still unclickable", "draft it. but i actually meant specifically for NET",
+              "i thought we created a force recheck button?", "no thts a different project",
+              "for any and all options recommendations id like a confidence level",
+              "at this point forward treat the two accounts as one", "whoops wrong window"]:
         assert learn.is_correction(t), t
-    for t in ["no problem", "No worries!", "nothing yet", "note this", "know what", "wrongly named but fine"]:
+    for t in ["no problem", "No worries!", "nothing yet", "note this", "know what", "wrongly named but fine",
+              "redo the inbox and then the handoff",  # an instruction, not a correction (v1 false positive)
+              "merge it and deploy to prod", "check your work", "do step 2 and commit",
+              "didnt work " + "x" * 300, "<pasted_content>still broken</pasted_content>"]:
         assert not learn.is_correction(t), t
+
+
+def test_learn_dismiss_keeps_no_copy():
+    st = dict(learn.EMPTY, corrections=[{"key": "k", "state": "pending", "text": "no, the MRN", "prev_reply": "r"}],
+              rules=[], active_days=[])
+    assert learn.dismiss(st, "k")[0]
+    assert st["corrections"][0]["text"] == st["corrections"][0]["prev_reply"] == ""
 
 
 def test_learn_recorder_keeps_typed_turns_only():
