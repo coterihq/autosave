@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Guard fails closed on a crash: the three `guard.py` entries in `settings.template.json` set `"onFailure": "block"` (Claude Code 2.1.295+), so a guard that crashes or times out blocks the call instead of letting it through. Unreadable input and a missing guard file still allow the call. The installer adds the setting to guard entries from earlier installs and never overrides an `onFailure` value you set. Checked live: with a crashing PreToolUse hook, `"block"` stopped a Bash call and the default let it run.
 - Learn: the correction detector reads the whole prompt, not just its first word. It now also catches failure reports ("didnt work", "still unclickable"), "I meant" / "I thought we", wrong-target replies and standing preferences ("from now on", "treat X as Y"). On an unseen sample it caught 3 of 5 corrections, where the old one caught 0. Prompts of 300+ characters and pasted content are not counted. "redo" no longer counts: it is an instruction.
 - Learn: stored text masks emails, phone numbers and runs of 6+ digits, and a dismissed correction keeps no copy of its text.
 

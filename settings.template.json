@@ -15,11 +15,11 @@
   "hooks": {
     "PreToolUse": [
       {"matcher": "Write|Edit|MultiEdit|NotebookEdit",
-       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "onFailure": "block"}]},
       {"matcher": "Bash",
-       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "onFailure": "block"}]},
       {"matcher": "mcp__.*__apply_migration",
-       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""}]},
+       "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/guard.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "onFailure": "block"}]},
       {"matcher": "Bash",
        "hooks": [{"type": "command", "command": "f=\"$HOME/.claude/hooks/bash_output_cap.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\"", "timeout": 5}]}
     ],
