@@ -35,4 +35,29 @@ for ev in ("UserPromptSubmit", "Stop", "SessionStart"):
     n = sum("hooks/learn.py" in x["command"] for e in h[ev] for x in e["hooks"])
     assert n == 1, (ev, n)
 PY
+# Guard fail-closed: the template sets onFailure "block" on every guard.py entry; an
+# upgrade adds it to entries wired before, and never overrides a value the user set.
+H3="$T/home3"; mkdir -p "$H3/.claude"
+python3 - "$KIT/settings.template.json" "$H3/.claude/settings.json" <<'PY'
+import json, sys
+t = json.load(open(sys.argv[1]))
+g = [x for e in t["hooks"]["PreToolUse"] for x in e["hooks"] if "hooks/guard.py" in x["command"]]
+assert len(g) == 3 and all(x.get("onFailure") == "block" for x in g), g
+cmd = 'f="$HOME/.claude/hooks/guard.py"; [ -f "$f" ] || exit 0; python3 "$f"'
+old = {"hooks": {"PreToolUse": [
+    {"matcher": "Bash", "hooks": [{"type": "command", "command": cmd}]},
+    {"matcher": "Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": cmd, "onFailure": "continue"}]}]}}
+json.dump(old, open(sys.argv[2], "w"))
+PY
+HOME="$H3" bash "$T/kit/install.sh" > "$T/out4.txt" 2>&1 || { echo "FAIL: upgrade install"; cat "$T/out4.txt"; exit 1; }
+python3 - "$H3/.claude/settings.json" <<'PY' || { echo "FAIL: guard onFailure upgrade"; exit 1; }
+import json, sys
+pre = json.load(open(sys.argv[1]))["hooks"]["PreToolUse"]
+by = {}
+for e in pre:
+    by.setdefault(e.get("matcher", ""), []).extend(x for x in e["hooks"] if "hooks/guard.py" in x["command"])
+assert [x["onFailure"] for x in by["Bash"]] == ["block"], by["Bash"]
+assert [x["onFailure"] for x in by["Write|Edit|MultiEdit|NotebookEdit"]] == ["continue"], "user value overridden"
+assert sum(len(v) for v in by.values()) == 3, by
+PY
 echo "upgrade_test: pass"

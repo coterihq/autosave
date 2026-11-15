@@ -144,15 +144,19 @@ if os.environ["DO_SETTINGS"] == "1":
     for k, v in tpl["env"].items():
         env.setdefault(k, v)
     def wired(ev, matcher, script):
-        for e in new.get("hooks", {}).get(ev, []):
-            if e.get("matcher", "") == matcher and any(".claude/hooks/" + script in (h.get("command") or "") for h in e.get("hooks", [])):
-                return True
-        return False
+        return [h for e in new.get("hooks", {}).get(ev, []) if e.get("matcher", "") == matcher
+                for h in e.get("hooks", []) if ".claude/hooks/" + script in (h.get("command") or "")]
     for ev, entries in tpl["hooks"].items():
         for e in entries:
             script = re.search(r"hooks/(\w+\.py)", e["hooks"][0]["command"]).group(1)
-            if wired(ev, e.get("matcher", ""), script):
-                continue  # already wired for this event + matcher (any path spelling)
+            have = wired(ev, e.get("matcher", ""), script)
+            if have:
+                # already wired for this event + matcher (any path spelling); add a new
+                # onFailure setting on upgrade, but never override one the user set
+                if "onFailure" in e["hooks"][0]:
+                    for h in have:
+                        h.setdefault("onFailure", e["hooks"][0]["onFailure"])
+                continue
             new.setdefault("hooks", {}).setdefault(ev, []).append(e)
     if "statusLine" not in new:
         new["statusLine"] = tpl["statusLine"]
