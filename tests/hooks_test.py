@@ -365,6 +365,14 @@ def test_learn_kill_report():
     assert len(lines) == 4 and all(l.startswith("FAIL") for l in lines), lines
 
 
+def test_learn_kill_acceptance_na_when_no_offer_answered():
+    # Pending detector hits with no yes or no are 0/0: report n/a, never a measured 0.00.
+    st = _st(corrections=_pend("k1", "k2"))
+    with _home(tmp_home()):
+        line = [l for l in learn.status(st, "2026-11-10", kill=True).splitlines() if "acceptance" in l]
+    assert line == ["FAIL acceptance n/a: 0 offers answered (need 0.30)"], line
+
+
 # The ban covers strings Learn authors; user-typed text is quoted verbatim as a receipt.
 def test_learn_output_never_says_proven_or_works():
     import re

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Learn: `learn.py status --kill` reports acceptance as "n/a: 0 offers answered" when no offer got a yes or no, instead of a measured 0.00, and shows how many offers were answered.
+
 ## 1.3.1 — 2026-11-14
 
 - Cross-links in `README.md` and `skills/change-control` now name the paid pack Quest Audit (formerly Final Boss).

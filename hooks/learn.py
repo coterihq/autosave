@@ -314,11 +314,12 @@ def status(state, today, kill=False):
     if kill:
         det = [c for c in state["corrections"] if c["source"] == "detector"]
         ruled, dism = sum(c["state"] == "ruled" for c in det), sum(c["state"] == "dismissed" for c in det)
-        acc = ruled / (ruled + dism) if ruled + dism else 0.0
+        acc = ruled / (ruled + dism) if ruled + dism else None  # 0/0 is no data, not a 0% rate
         keys = [c["key"] for c in state["corrections"]]
         lk = lambda ok, msg: "%s %s" % ("PASS" if ok else "FAIL", msg)
         out += [lk(len(state["rules"]) >= 5, "rules approved: %d (need 5)" % len(state["rules"])),
-                lk(acc >= 0.30, "acceptance %.2f (need 0.30)" % acc),
+                lk(acc is not None and acc >= 0.30, "acceptance n/a: 0 offers answered (need 0.30)" if acc is None
+                   else "acceptance %.2f of %d answered (need 0.30)" % (acc, ruled + dism)),
                 lk(any(c["state"] == "repeat" for c in state["corrections"]), "corrections marked repeat: %d (need 1)" %
                    sum(c["state"] == "repeat" for c in state["corrections"])),
                 lk(not quarantine_count() and len(keys) == len(set(keys)), "state intact: quarantined %d, duplicate keys %d" %
